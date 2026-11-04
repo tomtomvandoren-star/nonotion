@@ -80,7 +80,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev \
-            libayatana-appindicator3-dev librsvg2-dev xvfb imagemagick xdotool x11-utils
+            libayatana-appindicator3-dev librsvg2-dev xvfb
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -99,40 +99,19 @@ jobs:
           pnpm icons
           pnpm build:linux
 
-      # Ubuntu 24.04 bloque les espaces de noms utilisateur dont le bac à sable de WebKitGTK a
-      # besoin : la vue web ne démarre pas. On les autorise sur cette machine de CI seulement.
-      - name: Bac à sable de WebKitGTK autorisé sur la machine de CI
-        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-
-      # L'écran virtuel n'a pas de carte graphique : rendu logiciel (sinon fenêtre noire).
-      # Sur un vrai poste, ces réglages ne sont pas utiles.
-      - name: Lancement dans un écran virtuel, frappe au clavier et captures
+      # Test de démarrage seulement : dans l'écran virtuel de la CI, la fenêtre de l'application
+      # n'apparaît pas (seule la fenêtre cachée de GTK existe, sans message d'erreur), donc aucune
+      # capture n'est possible ici. L'essai visuel se fera sur une vraie machine Linux (phase 8).
+      - name: L'application démarre et ne plante pas
         working-directory: apps/desktop
-        env:
-          GDK_BACKEND: x11
-          WEBKIT_DISABLE_DMABUF_RENDERER: '1'
-          WEBKIT_DISABLE_COMPOSITING_MODE: '1'
-          LIBGL_ALWAYS_SOFTWARE: '1'
         run: |
-          xvfb-run -a -s "-screen 0 1280x800x24" bash -c '
+          xvfb-run -a bash -c '
             ./src-tauri/target/release/nonotion > application.log 2>&1 &
             app=$!
             sleep 15
-            kill -0 "$app" || { echo "L’application s’est arrêtée au lancement"; cat application.log; exit 1; }
-            echo "Fenêtres X :"; xwininfo -root -tree | grep -v "has no name" | head -20
-            import -window root capture-1-ouverture.png
-            # Un clic dans le premier paragraphe, fin de ligne, nouvelle ligne, puis « /tit » :
-            # le menu des blocs doit s’ouvrir et se filtrer sur les titres.
-            xdotool mousemove 500 190 click 1
-            sleep 1
-            xdotool key End Return
-            xdotool type --delay 120 "Tapé au clavier sous Linux. "
-            xdotool key Return
-            xdotool type --delay 120 "/tit"
-            sleep 2
-            import -window root capture-2-frappe-et-menu.png
+            if ! kill -0 "$app"; then echo "L’application s’est arrêtée au lancement"; cat application.log; exit 1; fi
             kill "$app"
-            echo "Sortie de l’application :"; cat application.log
+            cat application.log
           '
 
       - uses: actions/upload-artifact@v4
@@ -141,5 +120,4 @@ jobs:
           path: |
             apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage
             apps/desktop/src-tauri/target/release/bundle/deb/*.deb
-            apps/desktop/capture-*.png
           retention-days: 30

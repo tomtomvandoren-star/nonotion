@@ -8,8 +8,9 @@ Pour l'instant, l'application ne contient que le **bac à sable de l'éditeur** 
 sans compte ni serveur). Sous Linux, Tauri affiche la page avec WebKitGTK, moins répandu que
 Chromium : c'est ce qu'on vérifie tôt (spec 1.7).
 
-GitHub Actions (workflow « Builds natifs de test ») construit l'AppImage et le paquet `.deb`, lance
-l'application dans un écran virtuel et en garde une capture. Les icônes (`src-tauri/icons/`) sont
+GitHub Actions (workflow « Builds natifs de test ») construit l'AppImage et le paquet `.deb`, et
+vérifie que l'application démarre sans planter. L'essai visuel demande une vraie machine Linux : dans
+l'écran virtuel de la CI, la fenêtre n'apparaît pas. Les icônes (`src-tauri/icons/`) sont
 générées depuis `app-icon.svg` par `pnpm icons`.
 
 Pour le construire soi-même sous Linux (Rust et les paquets de
