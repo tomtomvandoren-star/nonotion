@@ -36,3 +36,4 @@ Une ligne par décision : la décision, puis sa raison (spec, section 0, règle 
 - **pnpm 12.16.1 via corepack (`packageManager`).** Version identique en local et en CI sans installation globale.
 - **Les « agent skills » proposées par des paquets npm (`pnpm approve`) ne sont pas approuvées.** Ce sont des instructions tierces, hors du périmètre du projet.
 - **PHP local : `curl.cainfo` pointe sur le bundle de certificats de Git for Windows.** PHP sous Windows n'a pas de magasin de certificats ; sur le serveur Linux, celui du système suffit.
+- **Limiteur de requêtes (`throttle`) sur le cache fichier (`cache.limiter`), pas sur la base.** Sinon `/api/health` répond 500 au lieu de 503 quand MariaDB est injoignable (constaté au premier déploiement), et chaque requête coûterait une écriture SQL.

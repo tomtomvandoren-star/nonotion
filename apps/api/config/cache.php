@@ -18,6 +18,12 @@ return [
     'default' => env('CACHE_STORE', 'database'),
 
     /*
+    | Le limiteur de requêtes (throttle) n'utilise pas la base : /api/health doit pouvoir
+    | répondre 503 quand MariaDB est injoignable, et on évite une écriture SQL par requête.
+    */
+    'limiter' => env('CACHE_LIMITER', 'file'),
+
+    /*
     |--------------------------------------------------------------------------
     | Cache Stores
     |--------------------------------------------------------------------------

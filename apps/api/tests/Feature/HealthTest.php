@@ -21,6 +21,8 @@ it('indique le dernier passage du planificateur', function () {
 });
 
 it('répond 503 sans détail technique quand la base est injoignable', function () {
+    // Comme en production : cache en base, mais limiteur de requêtes hors base.
+    config(['cache.default' => 'database']);
     $port = config('database.connections.mariadb.port');
     config(['database.connections.mariadb.port' => 1]);
     DB::purge('mariadb');
