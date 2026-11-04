@@ -57,6 +57,7 @@ connexions sortantes). Au premier envoi, le script crée le `.env` du serveur et
 les identifiants de la base.
 
 Planificateur : l'hébergement mutualisé n'autorise pas `crontab`. Dans le Manager (site › Outils
-avancés › Planificateur de tâches), programmer toutes les 15 minutes l'URL
+avancés › Planificateur de tâches), programmer à la fréquence la plus courte proposée (toutes les
+heures sur l'abonnement actuel) l'URL
 `https://<domaine>/api/cron`, protégée par mot de passe avec `CRON_USER` et `CRON_PASSWORD` du `.env`
 du serveur.
