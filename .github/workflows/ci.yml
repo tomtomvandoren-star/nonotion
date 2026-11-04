@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    services:
+      mariadb:
+        # Provisoire : à aligner sur la version de MariaDB du Manager Infomaniak.
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: nonotion_test
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_USERNAME: root
+      DB_PASSWORD: root
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: curl, fileinfo, intl, mbstring, openssl, pdo_mysql
+          tools: composer:v2
+
+      - name: Dépendances
+        run: |
+          pnpm install --frozen-lockfile
+          composer install --no-interaction --prefer-dist --working-dir=apps/api
+
+      - name: Configuration de l'API
+        working-directory: apps/api
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Lint (ESLint, Prettier, Pint)
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Tests unitaires (Vitest, Pest)
+        run: pnpm test
+
+      - name: Tests de bout en bout (Chromium, Firefox, WebKit)
+        env:
+          DB_DATABASE: nonotion_test
+        run: |
+          php apps/api/artisan migrate:fresh --force
+          pnpm exec playwright install --with-deps chromium firefox webkit
+          pnpm test:e2e

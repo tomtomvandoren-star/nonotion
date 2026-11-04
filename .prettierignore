@@ -1,0 +1,6 @@
+pnpm-lock.yaml
+apps/api/
+dist/
+test-results/
+playwright-report/
+PROMPT_CLAUDE_CODE_Nonotion.md

@@ -1,0 +1,63 @@
+@import 'tailwindcss';
+
+/* Jetons de couleur du design system (spec 7) : clair par défaut,
+   sombre selon le système, ou forcé par data-theme sur <html>. */
+:root {
+  color-scheme: light;
+  --bg: #ffffff;
+  --bg-sidebar: #f7f7f5;
+  --text: #37352f;
+  --text-muted: #787774;
+  --border: #e9e9e7;
+  --hover: #efefed;
+  --accent: #2383e2;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: #191919;
+    --bg-sidebar: #202020;
+    --text: #ebebea;
+    --text-muted: #9b9b9b;
+    --border: #2f2f2f;
+    --hover: #2b2b2b;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #191919;
+  --bg-sidebar: #202020;
+  --text: #ebebea;
+  --text-muted: #9b9b9b;
+  --border: #2f2f2f;
+  --hover: #2b2b2b;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-sidebar: var(--bg-sidebar);
+  --color-fg: var(--text);
+  --color-fg-muted: var(--text-muted);
+  --color-line: var(--border);
+  --color-hover: var(--hover);
+  --color-accent: var(--accent);
+  --font-sans: system-ui, Inter, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+/* Focus visible obligatoire : anneau bleu de 2 px (spec 7). */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

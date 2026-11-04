@@ -1,0 +1,41 @@
+# Dépendances
+node_modules/
+apps/api/vendor/
+
+# Builds
+dist/
+*.tsbuildinfo
+
+# Secrets : le .env du serveur n'est jamais versionné (spec 1.6.9)
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Front compilé copié dans le public Laravel par deploy.sh
+apps/api/public/index.html
+apps/api/public/assets/
+apps/api/public/manifest.webmanifest
+apps/api/public/sw.js
+apps/api/public/workbox-*.js
+
+# Fichiers des utilisateurs (vivent sur le serveur)
+apps/api/public/uploads/*
+!apps/api/public/uploads/.gitkeep
+apps/api/public/downloads/*
+!apps/api/public/downloads/.gitkeep
+
+# Tests
+test-results/
+playwright-report/
+coverage/
+
+# Outils
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Réglages locaux de Claude Code
+.claude/

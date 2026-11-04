@@ -1,0 +1,10 @@
+{
+  "name": "@nonotion/api",
+  "private": true,
+  "scripts": {
+    "dev": "php artisan serve --host=127.0.0.1 --port=8000",
+    "test": "php vendor/bin/pest",
+    "lint": "php vendor/bin/pint --test",
+    "format": "php vendor/bin/pint"
+  }
+}
