@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\TrashController;
 use App\Support\Heartbeat;
 use Illuminate\Support\Facades\Schedule;
 
@@ -11,3 +12,8 @@ use Illuminate\Support\Facades\Schedule;
 Schedule::call(fn () => Heartbeat::record(Heartbeat::CRON))
     ->everyMinute()
     ->name('heartbeat');
+
+// Corbeille : purge définitive après 30 jours (une seule requête, rien à faire la plupart du temps).
+Schedule::call(fn () => TrashController::purgeExpired())
+    ->everyMinute()
+    ->name('purge-trash');
