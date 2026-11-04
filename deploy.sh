@@ -7,7 +7,8 @@
 #   DEPLOY_PATH : dossier du code Laravel sur le serveur (relatif au dossier personnel, ou absolu).
 #                 La racine web du site doit pointer sur DEPLOY_PATH/public.
 #   DEPLOY_URL  : adresse publique du site
-# Facultatif : DEPLOY_PORT (22), DEPLOY_SSH_KEY (~/.ssh/nonotion_deploy), REMOTE_PHP (php), REMOTE_COMPOSER (composer).
+# Facultatif : DEPLOY_PORT (22), DEPLOY_SSH_KEY (~/.ssh/nonotion_deploy), REMOTE_PHP (php), REMOTE_COMPOSER (composer),
+#              DB_HOST, DB_DATABASE, DB_USERNAME (pré-remplis dans le .env du premier déploiement ; jamais le mot de passe).
 # --check : lance aussi « php artisan nonotion:hosting-check » sur le serveur (phase 0).
 #
 # L'accès SSH se fait par clé : le script ne demande ni ne stocke aucun mot de passe.
@@ -89,8 +90,9 @@ if [ ! -f .env ]; then
   cp .env.production.example .env
   chmod 600 .env
   sed -i "s#^APP_URL=.*#APP_URL=$DEPLOY_URL#; s#^FRONTEND_URL=.*#FRONTEND_URL=$DEPLOY_URL#" .env
+  sed -i "s#^DB_HOST=.*#DB_HOST=${DB_HOST:-}#; s#^DB_DATABASE=.*#DB_DATABASE=${DB_DATABASE:-}#; s#^DB_USERNAME=.*#DB_USERNAME=${DB_USERNAME:-}#" .env
   $REMOTE_PHP artisan key:generate --force
-  echo "ACTION : .env créé dans $DEPLOY_PATH. Remplis DB_HOST, DB_DATABASE, DB_USERNAME, DB_PASSWORD (et MAIL_*)," >&2
+  echo "ACTION : .env créé dans $DEPLOY_PATH. Complète DB_PASSWORD (et vérifie DB_HOST, DB_DATABASE, DB_USERNAME ; MAIL_* en phase 1)," >&2
   echo "sauvegarde la ligne APP_KEY hors du serveur, puis relance ./deploy.sh --check." >&2
   exit 2
 fi
