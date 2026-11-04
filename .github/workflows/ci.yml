@@ -11,7 +11,7 @@ jobs:
 
     services:
       mariadb:
-        # Provisoire : à aligner sur la version de MariaDB du Manager Infomaniak.
+        # Même branche que l'hébergement Infomaniak (MariaDB 10.11.19).
         image: mariadb:10.11
         env:
           MARIADB_ROOT_PASSWORD: root
@@ -37,7 +37,8 @@ jobs:
 
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.4'
+          # Même version que l'hébergement Infomaniak.
+          php-version: '8.5'
           extensions: curl, fileinfo, intl, mbstring, openssl, pdo_mysql
           tools: composer:v2
 

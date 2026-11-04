@@ -23,14 +23,18 @@ export function HomePage() {
       </p>
 
       <dl className="mt-10 divide-y divide-line border-y border-line text-sm" aria-live="polite">
-        <StatusRow label="API et base de données" value={apiStatus} />
-        <StatusRow label="Planificateur (cron)" value={cronStatus} />
+        <StatusRow label="API et base de données" value={apiStatus} ok={health.isSuccess} />
+        <StatusRow
+          label="Planificateur (cron)"
+          value={cronStatus}
+          ok={Boolean(health.data?.cron_last_run_at)}
+        />
       </dl>
     </main>
   )
 }
 
-function StatusRow({ label, value }: { label: string; value: string }) {
+function StatusRow({ label, value, ok }: { label: string; value: string; ok: boolean }) {
   const labelId = useId()
 
   return (
@@ -38,7 +42,7 @@ function StatusRow({ label, value }: { label: string; value: string }) {
       <dt id={labelId} className="text-fg-muted">
         {label}
       </dt>
-      <dd aria-labelledby={labelId} className="m-0 font-medium">
+      <dd aria-labelledby={labelId} className={`m-0 font-medium ${ok ? 'text-accent' : ''}`}>
         {value}
       </dd>
     </div>

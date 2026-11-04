@@ -1,41 +1,57 @@
 @import 'tailwindcss';
 
-/* Jetons de couleur du design system (spec 7) : clair par défaut,
-   sombre selon le système, ou forcé par data-theme sur <html>. */
+/* Jetons de couleur du design system (spec 7), construits sur la palette Nonotion :
+   pêche #F7D9BC, beige #CDB39C, taupe #AB9682, sauge #657868.
+   Clair par défaut, sombre selon le système, ou forcé par data-theme sur <html>.
+   Les teintes dérivées gardent un contraste AA (texte ≥ 4.5:1, accent ≥ 3:1). */
 :root {
+  --peach: #f7d9bc;
+  --tan: #cdb39c;
+  --taupe: #ab9682;
+  --sage: #657868;
+
   color-scheme: light;
   --bg: #ffffff;
-  --bg-sidebar: #f7f7f5;
+  --bg-sidebar: #fcf0e4; /* pêche à 40 % sur blanc */
   --text: #37352f;
-  --text-muted: #787774;
-  --border: #e9e9e7;
-  --hover: #efefed;
-  --accent: #2383e2;
+  --text-muted: #78695b; /* taupe assombri : 4.7:1 sur la barre latérale */
+  --border: #e9ddd2; /* beige à 45 % sur blanc */
+  --hover: rgb(205 179 156 / 0.25); /* beige translucide : visible sur fond blanc et pêche */
+  --accent: var(--sage); /* 4.7:1 sur blanc */
+  --accent-fg: #ffffff;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
-    --bg: #191919;
-    --bg-sidebar: #202020;
-    --text: #ebebea;
-    --text-muted: #9b9b9b;
-    --border: #2f2f2f;
-    --hover: #2b2b2b;
+    --bg: #1c1a18;
+    --bg-sidebar: #24211e;
+    --text: #ede6df;
+    --text-muted: var(--taupe); /* 6:1 sur le fond */
+    --border: #38322c;
+    --hover: rgb(205 179 156 / 0.1);
+    --accent: #8a9e8c; /* sauge éclairci : 6:1 sur le fond */
+    --accent-fg: #1c1a18;
   }
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --bg: #191919;
-  --bg-sidebar: #202020;
-  --text: #ebebea;
-  --text-muted: #9b9b9b;
-  --border: #2f2f2f;
-  --hover: #2b2b2b;
+  --bg: #1c1a18;
+  --bg-sidebar: #24211e;
+  --text: #ede6df;
+  --text-muted: var(--taupe);
+  --border: #38322c;
+  --hover: rgb(205 179 156 / 0.1);
+  --accent: #8a9e8c;
+  --accent-fg: #1c1a18;
 }
 
 @theme inline {
+  --color-peach: var(--peach);
+  --color-tan: var(--tan);
+  --color-taupe: var(--taupe);
+  --color-sage: var(--sage);
   --color-bg: var(--bg);
   --color-bg-sidebar: var(--bg-sidebar);
   --color-fg: var(--text);
@@ -43,6 +59,7 @@
   --color-line: var(--border);
   --color-hover: var(--hover);
   --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
   --font-sans: system-ui, Inter, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 

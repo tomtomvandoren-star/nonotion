@@ -51,5 +51,7 @@ pnpm test:e2e    # Playwright sur les trois moteurs
 
 ## Déployer
 
-Voir l'en-tête de [deploy.sh](deploy.sh). Au premier déploiement, lancer `./deploy.sh --check`
-pour vérifier l'hébergement (PHP, MariaDB, cron, connexions sortantes).
+Copier `deploy.env.example` en `deploy.env` et le remplir (voir l'en-tête de [deploy.sh](deploy.sh)),
+puis lancer `./deploy.sh --check` pour déployer et vérifier l'hébergement (PHP, MariaDB, cron,
+connexions sortantes). Au premier envoi, le script crée le `.env` du serveur et demande d'y saisir
+les identifiants de la base.

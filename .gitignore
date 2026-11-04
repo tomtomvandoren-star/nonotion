@@ -11,6 +11,7 @@ dist/
 .env.*
 !.env.example
 !.env.production.example
+deploy.env
 
 # Front compilé copié dans le public Laravel par deploy.sh
 apps/api/public/index.html
