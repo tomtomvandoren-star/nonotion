@@ -55,3 +55,8 @@ Copier `deploy.env.example` en `deploy.env` et le remplir (voir l'en-tête de [d
 puis lancer `./deploy.sh --check` pour déployer et vérifier l'hébergement (PHP, MariaDB, cron,
 connexions sortantes). Au premier envoi, le script crée le `.env` du serveur et demande d'y saisir
 les identifiants de la base.
+
+Planificateur : l'hébergement mutualisé n'autorise pas `crontab`. Dans le Manager (site › Outils
+avancés › Planificateur de tâches), programmer toutes les 15 minutes l'URL
+`https://<domaine>/api/cron`, protégée par mot de passe avec `CRON_USER` et `CRON_PASSWORD` du `.env`
+du serveur.

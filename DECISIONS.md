@@ -20,6 +20,9 @@ Une ligne par décision : la décision, puis sa raison (spec, section 0, règle 
 - **`/api/health` minimal (écriture + lecture en base, date du dernier cron), limité à 30 appels/min.** Il est public et écrit en base à chaque appel.
 - **Commande `php artisan nonotion:hosting-check` pour le reste des vérifications.** Versions, extensions, limites PHP et test HTTPS sortant (avec `CURLOPT_RESOLVE`) ne sont visibles qu'en SSH, pas sur une URL publique.
 - **Battement du planificateur toutes les minutes (`heartbeat`).** Prouve que la tâche cron du Manager tourne, quelle que soit sa fréquence.
+- **Le planificateur est lancé par `GET /api/cron` (HTTP Basic, `CRON_USER` / `CRON_PASSWORD`), pas par `php artisan schedule:run`.** Écart avec la spec 1.8, validé par l'utilisateur : l'hébergement mutualisé refuse `crontab` et son Planificateur de tâches n'appelle qu'une URL, au plus toutes les 15 minutes. Sans mot de passe, l'URL répond 404.
+- **Tâches planifiées en `everyMinute()` qui décident elles-mêmes si elles ont du travail, et uniquement `Schedule::call()` / `Schedule::job()`.** Le webcron passe à des minutes quelconques (un `everyThirtyMinutes()` pourrait ne jamais tomber juste) et tourne dans une requête web, où `->command()` ne peut pas lancer de PHP en ligne de commande. La resynchronisation ICS s'appuiera sur `next_sync_at`, plus la synchronisation à l'ouverture (spec 1.7).
+- **`deploy.sh` génère `CRON_PASSWORD` sur le serveur s'il manque.** Comme l'`APP_KEY`, il ne transite jamais par le poste de développement.
 - **Pas de routes « web » Laravel ni de route `/up`.** La SPA sert `/` (`DirectoryIndex index.html`) ; l'API vit sous `/api`.
 - **`QUEUE_CONNECTION=sync`.** Pas de worker permanent sur un hébergement mutualisé.
 - **En dev, Vite relaie `/api` vers `php artisan serve`.** Même origine qu'en production ; `CORS_ALLOWED_ORIGINS` servira aux WebViews (phases 8 et 9).

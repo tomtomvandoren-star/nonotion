@@ -129,10 +129,12 @@ class HostingCheck extends Command
             $lastRun = null;
         }
 
-        // Pas un échec : le cron se crée dans le Manager après le premier déploiement.
+        // Pas un échec : la tâche se crée dans le Manager après le premier déploiement.
         $this->report('Dernier passage du cron', $lastRun === null
-            ? 'jamais (créer la tâche cron « php artisan schedule:run »)'
+            ? 'jamais (programmer GET /api/cron dans le Planificateur de tâches du Manager)'
             : $lastRun->diffForHumans());
+
+        $this->report('Mot de passe de /api/cron', config('nonotion.cron.password') ? 'défini' : 'absent (URL désactivée)');
     }
 
     private function checkOutboundHttps(): void

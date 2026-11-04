@@ -96,6 +96,13 @@ if [ ! -f .env ]; then
   echo "sauvegarde la ligne APP_KEY hors du serveur, puis relance ./deploy.sh --check." >&2
   exit 2
 fi
+if ! grep -q '^CRON_PASSWORD=.' .env; then
+  # Mot de passe du webcron (GET /api/cron), généré sur le serveur et jamais affiché ici.
+  cron_password="\$($REMOTE_PHP -r 'echo bin2hex(random_bytes(24));')"
+  sed -i '/^CRON_USER=/d; /^CRON_PASSWORD=/d' .env
+  printf '\nCRON_USER=nonotion-cron\nCRON_PASSWORD=%s\n' "\$cron_password" >> .env
+  echo "INFO : CRON_PASSWORD créé dans .env (à recopier dans le Planificateur de tâches du Manager)."
+fi
 $REMOTE_PHP artisan migrate --force
 $REMOTE_PHP artisan config:cache
 $REMOTE_PHP artisan route:cache
