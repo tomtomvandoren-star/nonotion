@@ -80,7 +80,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev \
-            libayatana-appindicator3-dev librsvg2-dev xvfb imagemagick xdotool
+            libayatana-appindicator3-dev librsvg2-dev xvfb imagemagick xdotool x11-utils
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -104,6 +104,7 @@ jobs:
       - name: Lancement dans un écran virtuel, frappe au clavier et captures
         working-directory: apps/desktop
         env:
+          GDK_BACKEND: x11
           WEBKIT_DISABLE_DMABUF_RENDERER: '1'
           WEBKIT_DISABLE_COMPOSITING_MODE: '1'
           LIBGL_ALWAYS_SOFTWARE: '1'
@@ -113,6 +114,10 @@ jobs:
             app=$!
             sleep 15
             kill -0 "$app" || { echo "L’application s’est arrêtée au lancement"; exit 1; }
+            echo "Fenêtres X :"; xwininfo -root -tree | grep -v "has no name" | head -20
+            window=$(xdotool search --name Nonotion | head -1)
+            echo "Fenêtre Nonotion : ${window:-introuvable}"
+            if [ -n "$window" ]; then import -window "$window" capture-0-fenetre.png; fi
             import -window root capture-1-ouverture.png
             # Un clic dans le premier paragraphe, fin de ligne, nouvelle ligne, puis « /tit » :
             # le menu des blocs doit s’ouvrir et se filtrer sur les titres.
