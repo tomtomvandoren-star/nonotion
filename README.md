@@ -31,6 +31,7 @@ composer install --working-dir=apps/api
 cp apps/api/.env.example apps/api/.env
 php apps/api/artisan key:generate
 php apps/api/artisan migrate
+php apps/api/artisan db:seed   # compte de démonstration local (voir database/seeders)
 ```
 
 Puis, dans deux terminaux :

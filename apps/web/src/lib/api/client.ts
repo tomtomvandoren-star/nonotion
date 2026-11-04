@@ -1,4 +1,5 @@
 import type { z } from 'zod'
+import { getToken } from '@/lib/session'
 
 /**
  * Point d'entrée unique vers l'API (spec 1.6.1) : le web, Tauri et Capacitor passent tous par ici.
@@ -6,27 +7,73 @@ import type { z } from 'zod'
  */
 const API_URL = import.meta.env.VITE_API_URL ?? '/api'
 
+/** Erreurs de validation renvoyées par Laravel (422) : champ → messages. */
+export type FieldErrors = Record<string, string[]>
+
 export class ApiError extends Error {
   readonly status: number
+  readonly errors: FieldErrors
+  readonly body: unknown
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, errors: FieldErrors = {}, body: unknown = null) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    this.errors = errors
+    this.body = body
   }
+
+  /** Premier message d'erreur du champ, pour l'afficher sous le champ du formulaire. */
+  fieldError(field: string): string | undefined {
+    return this.errors[field]?.[0]
+  }
+}
+
+let onUnauthorized: () => void = () => {}
+
+/** Que faire quand le jeton n'est plus valide (révoqué, expiré) : en général, revenir à la connexion. */
+export function setUnauthorizedHandler(handler: () => void): void {
+  onUnauthorized = handler
 }
 
 export function apiUrl(path: string, base: string = API_URL): string {
   return `${base.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`
 }
 
-/** GET JSON, validé par un schéma Zod : une réponse inattendue lève une erreur au lieu de passer en silence. */
-export async function apiGet<T>(path: string, schema: z.ZodType<T>): Promise<T> {
-  const response = await fetch(apiUrl(path), { headers: { Accept: 'application/json' } })
+type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+
+/** Requête JSON ; la réponse est validée par un schéma Zod, pour ne jamais accepter de données inattendues. */
+export async function apiRequest<T>(
+  method: Method,
+  path: string,
+  schema: z.ZodType<T>,
+  body?: unknown,
+): Promise<T> {
+  const token = getToken()
+  const headers: Record<string, string> = { Accept: 'application/json' }
+  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  const response = await fetch(apiUrl(path), {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+
+  const data: unknown = response.status === 204 ? null : await response.json().catch(() => null)
 
   if (!response.ok) {
-    throw new ApiError(response.status, `GET ${path} : HTTP ${response.status}`)
+    if (response.status === 401 && token) onUnauthorized()
+    const payload = (data ?? {}) as { message?: string; errors?: FieldErrors }
+    throw new ApiError(
+      response.status,
+      payload.message ?? `${method} ${path} : HTTP ${response.status}`,
+      payload.errors ?? {},
+      data,
+    )
   }
 
-  return schema.parse(await response.json())
+  return schema.parse(data)
 }
+
+export const apiGet = <T>(path: string, schema: z.ZodType<T>) => apiRequest('GET', path, schema)

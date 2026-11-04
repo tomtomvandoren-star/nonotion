@@ -12,10 +12,12 @@ use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\PersonalAccessToken;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 /**
  * Comptes par jetons Bearer (Sanctum) : un seul mécanisme pour le web, le desktop et le mobile.
@@ -82,8 +84,14 @@ class AuthController extends Controller
 
     public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
     {
-        // Même réponse que le compte existe ou non : on ne révèle pas quelles adresses sont inscrites.
-        Password::sendResetLink(['email' => $request->input('email')]);
+        try {
+            // Même réponse que le compte existe ou non : on ne révèle pas quelles adresses sont inscrites.
+            Password::sendResetLink(['email' => $request->input('email')]);
+        } catch (TransportExceptionInterface $e) {
+            Log::error('Envoi de l’e-mail de réinitialisation impossible', ['exception' => $e::class]);
+
+            return response()->json(['message' => __('auth.mail_unavailable')], 503);
+        }
 
         return response()->json(['message' => __('auth.reset_link_sent')]);
     }

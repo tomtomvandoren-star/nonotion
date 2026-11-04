@@ -5,6 +5,7 @@ use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
+use Symfony\Component\Mailer\Exception\TransportException;
 
 function registerPayload(array $overrides = []): array
 {
@@ -99,6 +100,15 @@ it('envoie un lien de réinitialisation vers le front, sans révéler si le comp
         return str_starts_with($mail->actionUrl, config('nonotion.frontend_url').'/reset-password?token=')
             && $mail->subject === 'Réinitialiser votre mot de passe Nonotion';
     });
+});
+
+it('répond 503 avec un message clair si l’envoi d’e-mails ne marche pas', function () {
+    $user = createAccount('Gaby');
+    Password::shouldReceive('sendResetLink')->andThrow(new TransportException('SMTP injoignable'));
+
+    $this->postJson('/api/auth/forgot-password', ['email' => $user->email])
+        ->assertStatus(503)
+        ->assertJsonPath('message', 'L’envoi d’e-mails est indisponible pour le moment. Réessayez plus tard.');
 });
 
 it('réinitialise le mot de passe et déconnecte tous les appareils', function () {

@@ -4,7 +4,10 @@ namespace App\Providers;
 
 use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -22,6 +25,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Créations de compte : 10 par minute et par adresse IP, sauf en local et dans les tests,
+        // où les tests de bout en bout créent un compte par scénario.
+        RateLimiter::for('register', fn (Request $request) => app()->environment('local', 'testing')
+            ? Limit::none()
+            : Limit::perMinute(10)->by($request->ip()));
+
         // E-mail de réinitialisation en français ; le lien mène au front (SPA),
         // qui appelle ensuite POST /api/auth/reset-password.
         ResetPassword::toMailUsing(function (User $user, string $token) {

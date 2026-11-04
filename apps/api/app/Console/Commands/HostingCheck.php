@@ -135,6 +135,13 @@ class HostingCheck extends Command
             : $lastRun->diffForHumans());
 
         $this->report('Mot de passe de /api/cron', config('nonotion.cron.password') ? 'défini' : 'absent (URL désactivée)');
+
+        // Pas un échec : sans SMTP, seule la réinitialisation du mot de passe par e-mail est indisponible.
+        $mailer = (string) config('mail.default');
+        $smtpReady = $mailer !== 'smtp' || (config('mail.mailers.smtp.username') && config('mail.from.address'));
+        $this->report('E-mails (réinitialisation du mot de passe)', $smtpReady
+            ? "envoi par {$mailer}"
+            : 'SMTP incomplet : remplir MAIL_USERNAME, MAIL_PASSWORD et MAIL_FROM_ADDRESS');
     }
 
     private function checkOutboundHttps(): void

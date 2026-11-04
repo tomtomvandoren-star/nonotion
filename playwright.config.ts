@@ -7,6 +7,9 @@ const isCI = Boolean(process.env.CI)
 export default defineConfig({
   testDir: 'e2e',
   fullyParallel: true,
+  // Le serveur de développement PHP ne traite qu'une requête à la fois sous Windows :
+  // en local, les scénarios passent l'un après l'autre. En CI (Linux), il a plusieurs processus.
+  workers: isCI ? 2 : 1,
   forbidOnly: isCI,
   retries: isCI ? 2 : 0,
   use: {
@@ -22,6 +25,7 @@ export default defineConfig({
     {
       command: 'php artisan serve --host=127.0.0.1 --port=8000',
       cwd: 'apps/api',
+      env: isCI ? { PHP_CLI_SERVER_WORKERS: '4' } : {},
       url: 'http://127.0.0.1:8000/api/health',
       reuseExistingServer: !isCI,
       timeout: 120_000,
