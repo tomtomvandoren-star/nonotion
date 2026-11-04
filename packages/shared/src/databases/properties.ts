@@ -90,7 +90,8 @@ export function hasOptions(property: Property): property is PropertyWithOptions 
  * Une plage a une fin du même genre, qui n'est pas avant le début.
  */
 const DAY = /^\d{4}-\d{2}-\d{2}$/
-const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/
+const INSTANT =
+  /^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d(:[0-5]\d(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/
 
 function isValidDay(value: string): boolean {
   if (!DAY.test(value)) return false

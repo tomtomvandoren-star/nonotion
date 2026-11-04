@@ -22,9 +22,9 @@ class TrashController extends Controller
     {
         Gate::authorize('view', $workspace);
 
+        // Une ligne de base supprimée seule y figure aussi ; partie avec sa page, elle reviendra avec elle.
         $trashed = Page::onlyTrashed()
             ->where('workspace_id', $workspace->id)
-            ->whereNull('database_id')
             ->orderByDesc('deleted_at')
             ->limit(self::LIMIT)
             ->get(['id', 'parent_page_id', 'title', 'icon', 'deleted_at']);
@@ -58,10 +58,11 @@ class TrashController extends Controller
                 ->where('deleted_at', $deletedAt)
                 ->update(['deleted_at' => null]);
 
-            // Si la page parente est encore à la corbeille, la page revient à la racine.
+            // Si la page parente est encore à la corbeille, la page revient à la racine. Une ligne de
+            // base, elle, reste rattachée à la page de sa base.
             $parentIsActive = $page->parent_page_id !== null
                 && Page::query()->whereKey($page->parent_page_id)->exists();
-            if (! $parentIsActive) {
+            if (! $parentIsActive && $page->database_id === null) {
                 $page->parent_page_id = null;
                 $page->position = Page::positionAtEnd($page->workspace_id, null);
             }

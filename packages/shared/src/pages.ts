@@ -21,6 +21,9 @@ export const pageContentSchema = z.array(z.record(z.string(), z.unknown())).null
 
 export const pageDetailSchema = pageTreeItemSchema.extend({
   workspace_id: z.string(),
+  /** Si la page est une ligne de base de données (spec 6.4) : sa base et ses valeurs. */
+  database_id: z.string().nullable().optional(),
+  properties: z.record(z.string(), z.unknown()).nullable().optional(),
   cover_url: z.string().nullable(),
   content: pageContentSchema,
   version: z.number().int().min(1),

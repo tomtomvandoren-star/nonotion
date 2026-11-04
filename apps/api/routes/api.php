@@ -2,9 +2,12 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CronController;
+use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\PageController;
+use App\Http\Controllers\PropertyController;
 use App\Http\Controllers\TrashController;
+use App\Http\Controllers\ViewController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', HealthController::class)->middleware('throttle:30,1');
@@ -39,4 +42,17 @@ Route::middleware(['auth:sanctum', 'throttle:240,1'])->group(function () {
 
     Route::post('/pages/{page}/restore', [TrashController::class, 'restore'])->withTrashed();
     Route::delete('/pages/{page}/permanent', [TrashController::class, 'destroy'])->withTrashed();
+
+    // Bases de données (spec 6.4 à 6.6) : les lignes sont des pages, modifiées par PATCH /pages/{page}.
+    Route::post('/workspaces/{workspace}/databases', [DatabaseController::class, 'store']);
+    Route::get('/databases/{database}', [DatabaseController::class, 'show']);
+    Route::patch('/databases/{database}', [DatabaseController::class, 'update']);
+    Route::post('/databases/{database}/rows', [DatabaseController::class, 'storeRow']);
+    Route::post('/databases/{database}/properties', [PropertyController::class, 'store']);
+    Route::patch('/databases/{database}/properties/{property}', [PropertyController::class, 'update']);
+    Route::delete('/databases/{database}/properties/{property}', [PropertyController::class, 'destroy']);
+    Route::post('/databases/{database}/views', [ViewController::class, 'store']);
+    Route::patch('/views/{view}', [ViewController::class, 'update']);
+    Route::post('/views/{view}/duplicate', [ViewController::class, 'duplicate']);
+    Route::delete('/views/{view}', [ViewController::class, 'destroy']);
 });

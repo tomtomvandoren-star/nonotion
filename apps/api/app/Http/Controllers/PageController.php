@@ -6,9 +6,12 @@ use App\Http\Requests\Pages\MovePageRequest;
 use App\Http\Requests\Pages\StorePageRequest;
 use App\Http\Requests\Pages\UpdatePageContentRequest;
 use App\Http\Requests\Pages\UpdatePageRequest;
+use App\Models\Database;
 use App\Models\Page;
 use App\Models\Workspace;
 use App\Support\BlockText;
+use App\Support\Databases\Databases;
+use App\Support\Databases\PageCopier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -65,18 +68,30 @@ class PageController extends Controller
         return response()->json(['data' => self::detail($page)]);
     }
 
-    /** Titre, icône, couverture, favori. Ne touche pas au contenu ni à sa version. */
+    /**
+     * Titre, icône, couverture, favori, et pour une ligne de base ses valeurs de propriétés
+     * (fusionnées : seules les propriétés envoyées changent). Ne touche pas au contenu ni à sa version.
+     */
     public function update(UpdatePageRequest $request, Page $page): JsonResponse
     {
         Gate::authorize('update', $page);
 
-        $attributes = $request->validated();
+        $attributes = $request->safe()->except('properties');
         if (array_key_exists('title', $attributes)) {
             $attributes['title'] = $attributes['title'] ?? '';
         }
-        $page->update($attributes);
 
-        return response()->json(['data' => self::treeItem($page)]);
+        if ($request->has('properties')) {
+            $database = $page->database_id === null ? null : Database::query()->find($page->database_id);
+            if ($database === null) {
+                throw ValidationException::withMessages(['properties' => 'Cette page n’est pas une ligne de base de données.']);
+            }
+            $values = Databases::validateValues($database, $request->input('properties', []));
+            $page->forceFill(['properties' => [...($page->properties ?? []), ...$values]]);
+        }
+        $page->fill($attributes)->save();
+
+        return response()->json(['data' => [...self::treeItem($page), 'properties' => (object) ($page->properties ?? [])]]);
     }
 
     /**
@@ -163,6 +178,10 @@ class PageController extends Controller
                 $level = $children->pluck('id')->all();
             }
 
+            // Les bases contenues dans ces pages sont copiées aussi, avec leurs vues et leurs lignes :
+            // la copie ne doit pas afficher (ni modifier) les données de l'original.
+            PageCopier::copyDatabases($copies);
+
             return $root;
         });
 
@@ -216,6 +235,8 @@ class PageController extends Controller
         return [
             ...self::treeItem($page),
             'workspace_id' => $page->workspace_id,
+            'database_id' => $page->database_id,
+            'properties' => $page->database_id === null ? null : (object) ($page->properties ?? []),
             'cover_url' => $page->cover_url,
             'content' => $page->content,
             'version' => $page->version,

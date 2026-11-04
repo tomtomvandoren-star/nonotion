@@ -1,17 +1,41 @@
 {
   "description": "Valeurs de propriétés valides et invalides : vérifiées à l'identique par le front (Vitest, Zod) et par l'API (Pest), pour que les deux appliquent les mêmes règles (spec 4.3).",
   "properties": {
-    "text": { "id": "txt", "name": "Notes", "type": "text" },
-    "number": { "id": "num", "name": "Prix", "type": "number" },
-    "checkbox": { "id": "chk", "name": "Fait", "type": "checkbox" },
-    "date": { "id": "due", "name": "Échéance", "type": "date" },
+    "text": {
+      "id": "txt",
+      "name": "Notes",
+      "type": "text"
+    },
+    "number": {
+      "id": "num",
+      "name": "Prix",
+      "type": "number"
+    },
+    "checkbox": {
+      "id": "chk",
+      "name": "Fait",
+      "type": "checkbox"
+    },
+    "date": {
+      "id": "due",
+      "name": "Échéance",
+      "type": "date"
+    },
     "select": {
       "id": "prio",
       "name": "Priorité",
       "type": "select",
       "options": [
-        { "id": "high", "name": "Haute", "color": "red" },
-        { "id": "low", "name": "Basse", "color": "gray" }
+        {
+          "id": "high",
+          "name": "Haute",
+          "color": "red"
+        },
+        {
+          "id": "low",
+          "name": "Basse",
+          "color": "gray"
+        }
       ]
     },
     "multi_select": {
@@ -19,8 +43,16 @@
       "name": "Étiquettes",
       "type": "multi_select",
       "options": [
-        { "id": "a", "name": "Travail", "color": "blue" },
-        { "id": "b", "name": "Perso", "color": "green" }
+        {
+          "id": "a",
+          "name": "Travail",
+          "color": "blue"
+        },
+        {
+          "id": "b",
+          "name": "Perso",
+          "color": "green"
+        }
       ]
     },
     "status": {
@@ -28,55 +60,241 @@
       "name": "Statut",
       "type": "status",
       "options": [
-        { "id": "todo", "name": "À faire", "color": "gray", "group": "todo" },
-        { "id": "done", "name": "Terminé", "color": "green", "group": "complete" }
+        {
+          "id": "todo",
+          "name": "À faire",
+          "color": "gray",
+          "group": "todo"
+        },
+        {
+          "id": "done",
+          "name": "Terminé",
+          "color": "green",
+          "group": "complete"
+        }
       ]
     }
   },
   "cases": [
-    { "property": "text", "value": "Bonjour", "valid": true },
-    { "property": "text", "value": "", "valid": true },
-    { "property": "text", "value": 12, "valid": false },
-    { "property": "text", "value": null, "valid": false },
-    { "property": "number", "value": 12.5, "valid": true },
-    { "property": "number", "value": -3, "valid": true },
-    { "property": "number", "value": null, "valid": true },
-    { "property": "number", "value": "12", "valid": false },
-    { "property": "checkbox", "value": true, "valid": true },
-    { "property": "checkbox", "value": false, "valid": true },
-    { "property": "checkbox", "value": 1, "valid": false },
-    { "property": "checkbox", "value": null, "valid": false },
-    { "property": "date", "value": null, "valid": true },
-    { "property": "date", "value": { "start": "2026-11-05" }, "valid": true },
-    { "property": "date", "value": { "start": "2026-11-05", "end": "2026-11-07" }, "valid": true },
-    { "property": "date", "value": { "start": "2026-11-05", "end": null }, "valid": true },
-    { "property": "date", "value": { "start": "2026-11-05T13:30:00Z" }, "valid": true },
     {
-      "property": "date",
-      "value": { "start": "2026-11-05T13:30:00+01:00", "end": "2026-11-05T15:00:00+01:00" },
+      "property": "text",
+      "value": "Bonjour",
       "valid": true
     },
-    { "property": "date", "value": { "start": "2026-02-30" }, "valid": false },
-    { "property": "date", "value": { "start": "05/11/2026" }, "valid": false },
-    { "property": "date", "value": { "start": "2026-11-07", "end": "2026-11-05" }, "valid": false },
     {
-      "property": "date",
-      "value": { "start": "2026-11-05", "end": "2026-11-05T10:00:00Z" },
+      "property": "text",
+      "value": "",
+      "valid": true
+    },
+    {
+      "property": "text",
+      "value": 12,
       "valid": false
     },
-    { "property": "date", "value": { "start": "2026-11-05", "hour": "10" }, "valid": false },
-    { "property": "date", "value": "2026-11-05", "valid": false },
-    { "property": "select", "value": "high", "valid": true },
-    { "property": "select", "value": null, "valid": true },
-    { "property": "select", "value": "medium", "valid": false },
-    { "property": "select", "value": ["high"], "valid": false },
-    { "property": "multi_select", "value": [], "valid": true },
-    { "property": "multi_select", "value": ["a", "b"], "valid": true },
-    { "property": "multi_select", "value": ["a", "a"], "valid": false },
-    { "property": "multi_select", "value": ["c"], "valid": false },
-    { "property": "multi_select", "value": "a", "valid": false },
-    { "property": "status", "value": "done", "valid": true },
-    { "property": "status", "value": null, "valid": true },
-    { "property": "status", "value": "waiting", "valid": false }
+    {
+      "property": "text",
+      "value": null,
+      "valid": false
+    },
+    {
+      "property": "number",
+      "value": 12.5,
+      "valid": true
+    },
+    {
+      "property": "number",
+      "value": -3,
+      "valid": true
+    },
+    {
+      "property": "number",
+      "value": null,
+      "valid": true
+    },
+    {
+      "property": "number",
+      "value": "12",
+      "valid": false
+    },
+    {
+      "property": "checkbox",
+      "value": true,
+      "valid": true
+    },
+    {
+      "property": "checkbox",
+      "value": false,
+      "valid": true
+    },
+    {
+      "property": "checkbox",
+      "value": 1,
+      "valid": false
+    },
+    {
+      "property": "checkbox",
+      "value": null,
+      "valid": false
+    },
+    {
+      "property": "date",
+      "value": null,
+      "valid": true
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05"
+      },
+      "valid": true
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05",
+        "end": "2026-11-07"
+      },
+      "valid": true
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05",
+        "end": null
+      },
+      "valid": true
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05T13:30:00Z"
+      },
+      "valid": true
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05T13:30:00+01:00",
+        "end": "2026-11-05T15:00:00+01:00"
+      },
+      "valid": true
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05T25:00:00Z"
+      },
+      "valid": false
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05T13:30"
+      },
+      "valid": false
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-02-30"
+      },
+      "valid": false
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "05/11/2026"
+      },
+      "valid": false
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-07",
+        "end": "2026-11-05"
+      },
+      "valid": false
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05",
+        "end": "2026-11-05T10:00:00Z"
+      },
+      "valid": false
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05",
+        "hour": "10"
+      },
+      "valid": false
+    },
+    {
+      "property": "date",
+      "value": "2026-11-05",
+      "valid": false
+    },
+    {
+      "property": "select",
+      "value": "high",
+      "valid": true
+    },
+    {
+      "property": "select",
+      "value": null,
+      "valid": true
+    },
+    {
+      "property": "select",
+      "value": "medium",
+      "valid": false
+    },
+    {
+      "property": "select",
+      "value": ["high"],
+      "valid": false
+    },
+    {
+      "property": "multi_select",
+      "value": [],
+      "valid": true
+    },
+    {
+      "property": "multi_select",
+      "value": ["a", "b"],
+      "valid": true
+    },
+    {
+      "property": "multi_select",
+      "value": ["a", "a"],
+      "valid": false
+    },
+    {
+      "property": "multi_select",
+      "value": ["c"],
+      "valid": false
+    },
+    {
+      "property": "multi_select",
+      "value": "a",
+      "valid": false
+    },
+    {
+      "property": "status",
+      "value": "done",
+      "valid": true
+    },
+    {
+      "property": "status",
+      "value": null,
+      "valid": true
+    },
+    {
+      "property": "status",
+      "value": "waiting",
+      "valid": false
+    }
   ]
 }

@@ -15,11 +15,15 @@ return Application::configure(basePath: dirname(__DIR__))
         // L'API répond 401 en JSON ; la page de connexion appartient au front.
         $middleware->redirectGuestsTo('/login');
 
-        // Le document d'une page est enregistré tel quel : les espaces en bord de texte
-        // et les textes vides font partie du contenu (« Deuxième » + « ligne »).
-        $isPageContent = fn (Request $request) => $request->is('api/pages/*/content');
-        $middleware->trimStrings(except: [$isPageContent]);
-        $middleware->convertEmptyStringsToNull(except: [$isPageContent]);
+        // Le document d'une page et les valeurs des bases sont enregistrés tels quels : les espaces
+        // en bord de texte et les textes vides en font partie (« Deuxième » + « ligne », une cellule
+        // vidée vaut « » et non null).
+        $isRawData = fn (Request $request) => $request->is('api/pages/*/content')
+            || $request->is('api/databases/*')
+            || $request->is('api/views/*')
+            || ($request->is('api/pages/*') && $request->has('properties'));
+        $middleware->trimStrings(except: [$isRawData]);
+        $middleware->convertEmptyStringsToNull(except: [$isRawData]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
