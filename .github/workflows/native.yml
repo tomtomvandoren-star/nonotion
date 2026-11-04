@@ -80,7 +80,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev \
-            libayatana-appindicator3-dev librsvg2-dev xvfb imagemagick
+            libayatana-appindicator3-dev librsvg2-dev xvfb imagemagick xdotool
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -99,15 +99,31 @@ jobs:
           pnpm icons
           pnpm build:linux
 
-      - name: Lancement dans un écran virtuel, avec capture
+      # L'écran virtuel n'a pas de carte graphique : sans ces réglages, WebKitGTK affiche une
+      # fenêtre noire (son rendu DMABUF demande un GPU). Sur un vrai poste, ils ne sont pas utiles.
+      - name: Lancement dans un écran virtuel, frappe au clavier et captures
         working-directory: apps/desktop
+        env:
+          WEBKIT_DISABLE_DMABUF_RENDERER: '1'
+          WEBKIT_DISABLE_COMPOSITING_MODE: '1'
+          LIBGL_ALWAYS_SOFTWARE: '1'
         run: |
           xvfb-run -a -s "-screen 0 1280x800x24" bash -c '
             ./src-tauri/target/release/nonotion &
             app=$!
-            sleep 20
+            sleep 15
             kill -0 "$app" || { echo "L’application s’est arrêtée au lancement"; exit 1; }
-            import -window root capture-linux.png
+            import -window root capture-1-ouverture.png
+            # Un clic dans le premier paragraphe, fin de ligne, nouvelle ligne, puis « /tit » :
+            # le menu des blocs doit s’ouvrir et se filtrer sur les titres.
+            xdotool mousemove 500 190 click 1
+            sleep 1
+            xdotool key End Return
+            xdotool type --delay 120 "Tapé au clavier sous Linux. "
+            xdotool key Return
+            xdotool type --delay 120 "/tit"
+            sleep 2
+            import -window root capture-2-frappe-et-menu.png
             kill "$app"
           '
 
@@ -117,5 +133,5 @@ jobs:
           path: |
             apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage
             apps/desktop/src-tauri/target/release/bundle/deb/*.deb
-            apps/desktop/capture-linux.png
+            apps/desktop/capture-*.png
           retention-days: 30
