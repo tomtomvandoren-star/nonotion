@@ -9,6 +9,7 @@ Une ligne par décision : la décision, puis sa raison (spec, section 0, règle 
 - **TypeScript 6.0.3, pas 7.x.** typescript-eslint 8.72 ne prend en charge que TypeScript < 6.1.
 - **Versions JS épinglées sans `^`.** BlockNote est en 0.x et son format JSON est stocké en base : une mise à jour doit être volontaire.
 - **PHP 8.5 sur Infomaniak et en CI, 8.4 en local.** Version choisie dans le Manager ; Laravel 13 exige PHP ≥ 8.3 et Pest 5 PHP ≥ 8.4, donc les deux conviennent. Passer le poste en 8.5 si un écart apparaît.
+- **Sur le serveur, artisan, Composer et le cron utilisent `/opt/php8.5/bin/php` et `/opt/php8.5/bin/composer`.** Le `php` par défaut en SSH est en 8.4, pas la version du site.
 - **Pest 5 à la place de PHPUnit, tests sur MariaDB (`nonotion_test`), pas sur SQLite.** Collations, index FULLTEXT et contraintes uniques doivent se comporter comme en production.
 - **MariaDB locale = celle de XAMPP (10.4.32), compte `root` sans mot de passe.** La table `mysql.db` de XAMPP est corrompue, ce qui empêche de créer un compte dédié. Plus ancienne qu'Infomaniak (10.11.19) : la CI fait foi.
 - **CI sur MariaDB 10.11.** Même branche que l'hébergement Infomaniak (10.11.19).
