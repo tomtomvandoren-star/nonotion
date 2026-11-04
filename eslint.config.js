@@ -6,7 +6,16 @@ import globals from 'globals'
 import tseslint from 'typescript-eslint'
 
 export default defineConfig(
-  { ignores: ['**/dist/**', 'apps/api/**', 'test-results/**', 'playwright-report/**'] },
+  {
+    ignores: [
+      '**/dist/**',
+      '**/dist-sandbox/**',
+      'apps/desktop/src-tauri/target/**',
+      'apps/api/**',
+      'test-results/**',
+      'playwright-report/**',
+    ],
+  },
   js.configs.recommended,
   tseslint.configs.recommended,
   {

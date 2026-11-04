@@ -1,0 +1,12 @@
+{
+  "name": "@nonotion/desktop",
+  "private": true,
+  "scripts": {
+    "tauri": "tauri",
+    "icons": "tauri icon app-icon.svg",
+    "build:linux": "tauri build --bundles appimage,deb"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.4"
+  }
+}

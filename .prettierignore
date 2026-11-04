@@ -1,6 +1,9 @@
 pnpm-lock.yaml
 apps/api/
 dist/
+dist-sandbox/
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/icons/
 test-results/
 playwright-report/
 PROMPT_CLAUDE_CODE_Nonotion.md

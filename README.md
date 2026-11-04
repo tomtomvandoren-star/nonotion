@@ -10,8 +10,8 @@ techniques dans [DECISIONS.md](DECISIONS.md).
 ```
 apps/web/         front React + Vite (SPA, plus tard PWA, Tauri et Capacitor)
 apps/api/         API Laravel 13 + MariaDB
-apps/desktop/     Tauri 2 (phase 8)
-apps/mobile/      Capacitor (phase 9)
+apps/desktop/     Tauri 2 (phase 8 ; pour l'instant, le bac à sable de l'éditeur)
+apps/mobile/      Capacitor (phase 9 ; pour l'instant, le bac à sable de l'éditeur)
 packages/shared/  code TypeScript partagé (schémas Zod, moteur de vues)
 e2e/              tests Playwright (Chromium, Firefox, WebKit)
 deploy.sh         déploiement sur l'hébergement Infomaniak
@@ -49,6 +49,13 @@ pnpm typecheck
 pnpm test        # Vitest et Pest (base MariaDB nonotion_test)
 pnpm test:e2e    # Playwright sur les trois moteurs
 ```
+
+## Bac à sable de l'éditeur
+
+L'éditeur seul, sans compte ni serveur : `http://localhost:5173/sandbox.html` en développement,
+`pnpm --filter @nonotion/web build:sandbox` pour le construire. C'est lui qu'emballent les builds
+natifs de test (workflow « Builds natifs de test » : APK Android, AppImage et .deb Linux), voir
+[apps/mobile](apps/mobile/README.md) et [apps/desktop](apps/desktop/README.md).
 
 ## Déployer
 

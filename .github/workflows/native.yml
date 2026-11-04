@@ -1,0 +1,121 @@
+name: Builds natifs de test
+
+# Test précoce de la fin de la phase 2 (spec 9) : le bac à sable de l'éditeur emballé pour
+# Android (Capacitor) et pour Linux (Tauri, vue web WebKitGTK). Lancé à la main, ou quand
+# l'éditeur ou les emballages changent.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - apps/web/src/features/editor/**
+      - apps/web/src/sandbox/**
+      - apps/web/src/index.css
+      - apps/web/sandbox.html
+      - apps/mobile/**
+      - apps/desktop/**
+      - .github/workflows/native.yml
+
+concurrency:
+  group: native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Android (APK de test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Dépendances
+        run: pnpm install --frozen-lockfile
+
+      - name: Bac à sable de l'éditeur
+        run: pnpm --filter @nonotion/web build:sandbox
+
+      - name: Projet Android
+        working-directory: apps/mobile
+        run: |
+          pnpm add:android
+          pnpm sync:android
+
+      - name: Icône Nonotion
+        run: |
+          pnpm --filter @nonotion/desktop icons
+          cp -r apps/desktop/src-tauri/icons/android/. apps/mobile/android/app/src/main/res/
+
+      - name: APK de débogage
+        working-directory: apps/mobile/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nonotion-editeur-android
+          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+
+  linux:
+    name: Linux (Tauri, WebKitGTK)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Prérequis Tauri (WebKitGTK) et écran virtuel
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev \
+            libayatana-appindicator3-dev librsvg2-dev xvfb imagemagick
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+
+      - name: Dépendances
+        run: pnpm install --frozen-lockfile
+
+      - name: Bac à sable de l'éditeur
+        run: pnpm --filter @nonotion/web build:sandbox
+
+      - name: AppImage et paquet .deb
+        working-directory: apps/desktop
+        run: |
+          pnpm icons
+          pnpm build:linux
+
+      - name: Lancement dans un écran virtuel, avec capture
+        working-directory: apps/desktop
+        run: |
+          xvfb-run -a -s "-screen 0 1280x800x24" bash -c '
+            ./src-tauri/target/release/nonotion &
+            app=$!
+            sleep 20
+            kill -0 "$app" || { echo "L’application s’est arrêtée au lancement"; exit 1; }
+            import -window root capture-linux.png
+            kill "$app"
+          '
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nonotion-editeur-linux
+          path: |
+            apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage
+            apps/desktop/src-tauri/target/release/bundle/deb/*.deb
+            apps/desktop/capture-linux.png
+          retention-days: 30

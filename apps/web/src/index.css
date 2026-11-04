@@ -184,6 +184,13 @@
 .nn-editor [data-content-type='checkListItem'] input[type='checkbox'] {
   accent-color: var(--accent);
 }
+/* Au doigt, une case plus grande (spec 1.6.4). */
+@media (pointer: coarse) {
+  .nn-editor [data-content-type='checkListItem'] input[type='checkbox'] {
+    width: 20px;
+    height: 20px;
+  }
+}
 
 .nn-editor [data-content-type='quote'] blockquote {
   color: inherit;

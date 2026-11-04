@@ -7,7 +7,8 @@
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.node.json && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:sandbox": "vite build -c vite.sandbox.config.ts && node -e \"require('fs').renameSync('dist-sandbox/sandbox.html', 'dist-sandbox/index.html')\""
   },
   "dependencies": {
     "@blocknote/core": "0.57.0",
