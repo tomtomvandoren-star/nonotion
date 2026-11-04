@@ -1,31 +1,14 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import {
+  createPage,
   dragRow,
+  editorOf,
+  waitForContentSave,
   signUpAndOpen,
   treeLink,
   treeRows,
   waitForSave,
-  waitForTitleSave,
 } from './helpers'
-
-/** Crée une page (à la racine, ou sous `parent`) et lui donne un titre. */
-async function createPage(page: Page, title: string, parent?: string) {
-  if (parent) {
-    await treeLink(page, parent).hover()
-    await page.getByRole('button', { name: `Ajouter une sous-page dans ${parent}` }).click()
-  } else {
-    await page
-      .getByRole('navigation', { name: 'Navigation' })
-      .getByRole('button', { name: 'Nouvelle page' })
-      .click()
-  }
-  const titleField = page.getByLabel('Titre de la page')
-  await expect(titleField).toBeFocused()
-  const saved = waitForTitleSave(page)
-  await titleField.fill(title)
-  await expect(treeLink(page, title)).toBeVisible()
-  await saved
-}
 
 test.describe('6.1 Barre latérale et arbre de pages', () => {
   test('trois niveaux de pages, réordonnés, retrouvés à l’identique après rechargement', async ({
@@ -142,14 +125,14 @@ test.describe('6.2 Page', () => {
     )
 
     await title.press('Enter')
-    const body = page.getByLabel('Contenu de la page')
-    await expect(body).toBeFocused()
-    await body.pressSequentially('Première ligne')
-    await waitForSave(page)
+    await expect(editorOf(page)).toBeFocused()
+    const saved = waitForContentSave(page)
+    await page.keyboard.type('Première ligne')
+    await saved
 
     await page.reload()
     await expect(page.getByLabel('Titre de la page')).toHaveValue('Brouillon final')
-    await expect(page.getByLabel('Contenu de la page')).toHaveValue('Première ligne')
+    await expect(editorOf(page)).toHaveText('Première ligne')
   })
 
   test('ajouter une icône et une couverture', async ({ page, request }) => {

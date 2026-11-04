@@ -73,3 +73,50 @@ export function waitForTitleSave(page: Page) {
       response.request().method() === 'PATCH' && /\/api\/pages\/[^/]+$/.test(response.url()),
   )
 }
+
+/** Crée une page (à la racine, ou sous `parent`) et lui donne un titre. */
+export async function createPage(page: Page, title: string, parent?: string) {
+  if (parent) {
+    await treeLink(page, parent).hover()
+    await page.getByRole('button', { name: `Ajouter une sous-page dans ${parent}` }).click()
+  } else {
+    await page
+      .getByRole('navigation', { name: 'Navigation' })
+      .getByRole('button', { name: 'Nouvelle page' })
+      .click()
+  }
+  const titleField = page.getByLabel('Titre de la page')
+  await expect(titleField).toBeFocused()
+  const saved = waitForTitleSave(page)
+  await titleField.fill(title)
+  await expect(treeLink(page, title)).toBeVisible()
+  await saved
+}
+
+/** La zone d'écriture de l'éditeur de blocs. */
+export const editorOf = (page: Page) => page.getByTestId('page-editor').locator('.bn-editor')
+
+/**
+ * Les blocs du document, dans l'ordre : [type, texte]. Un titre s'écrit « heading:2 »
+ * (le niveau 1, par défaut, n'a pas d'attribut). Les blocs imbriqués suivent leur parent.
+ */
+export async function editorBlocks(page: Page): Promise<[string, string][]> {
+  return editorOf(page)
+    .locator('.bn-block-content')
+    .evaluateAll((blocks) =>
+      blocks.map((block) => {
+        const type = block.getAttribute('data-content-type') ?? ''
+        const level = block.getAttribute('data-level')
+        const label = type === 'heading' ? `heading:${level ?? '1'}` : type
+        return [label, (block.textContent ?? '').trim()] as [string, string]
+      }),
+    )
+}
+
+/** Attend l'enregistrement du contenu (le document de l'éditeur) par le serveur. */
+export function waitForContentSave(page: Page) {
+  return page.waitForResponse(
+    (response) =>
+      response.request().method() === 'PUT' && /\/api\/pages\/[^/]+\/content$/.test(response.url()),
+  )
+}

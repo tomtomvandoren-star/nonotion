@@ -65,3 +65,25 @@ Une ligne par décision : la décision, puis sa raison (spec, section 0, règle 
 - **Le contenu des pages échappe aux middlewares `TrimStrings` et `ConvertEmptyStringsToNull`.** Sinon les espaces en bord de texte disparaissent (« Deuxième » + « ligne » devenait « Deuxièmeligne »).
 - **Mot de passe oublié : 503 et message clair si l'envoi d'e-mails échoue.** Plutôt qu'une erreur 500 opaque ; la réponse reste la même que le compte existe ou non.
 - **Tests de bout en bout un par un en local, en parallèle en CI.** Sous Windows, le serveur de développement PHP ne traite qu'une requête à la fois ; sous Linux (CI), il a 4 processus.
+
+## Phase 2
+
+- **BlockNote 0.57.0 (`@blocknote/core`, `@blocknote/react`, `@blocknote/shadcn`), licence MPL-2.0, aucun paquet `@blocknote/xl-*`.** La version shadcn reprend les couleurs et composants du design system ; Tailwind génère ses classes (`@source`).
+- **L'éditeur est chargé à la demande, à l'ouverture de la première page.** BlockNote pèse environ 1 Mo : le reste de l'application (connexion, barre latérale, accueil) n'a pas à l'attendre.
+- **Blocs proposés : texte, titres 1 à 3, listes à puces et numérotées, to-do, liste dépliable, citation, séparateur, encadré, bloc de code.** C'est la liste de la phase 2 (spec 9). Image, fichier et tableau sont retirés du schéma tant que l'envoi de fichiers n'existe pas : un bloc qui ne marche pas n'a rien à faire dans le menu.
+- **Trois niveaux de titre, comme Notion.** Un titre de niveau 4 à 6 reçu (autre version) s'affiche en titre 3.
+- **L'encadré (callout) est un bloc maison (`createReactBlockSpec`), pas un paquet XL.** Émoji modifiable (même sélecteur que l'icône de page), fond pêche par défaut, couleur du menu du bloc sinon.
+- **Menu « / » : groupes Basique et Avancé ; Médias et Bases de données arrivent avec leurs phases.** Recherche dans le titre et dans des mots-clés français et anglais, sans tenir compte des accents ni des tirets ; dans un groupe, un titre qui commence par la saisie passe devant. Le raccourci Markdown de chaque bloc est affiché à droite, pour qu'on l'apprenne en passant.
+- **« / » n'ouvre le menu qu'en début de ligne ou après un espace.** Comme l'écrit la spec 6.3a ; dans « 1/2 » ou une adresse, c'est un caractère normal.
+- **« > » crée une liste dépliable et « " » une citation, comme dans Notion (spec 6.3b).** BlockNote fait de « > » une citation : notre règle passe avant la sienne.
+- **Après « --- », le curseur passe sur la ligne suivante.** BlockNote laissait le séparateur sélectionné : la suite de la frappe se perdait.
+- **Menu de la poignée ⠿ : Supprimer, Dupliquer, Transformer en…, Couleur.** « Commentaire » viendra avec les commentaires (phase 10), comme dans la barre flottante, qui n'a pas non plus « Mention » : mentionner une page ou une personne est une fonction à part, pas encore prévue.
+- **Pas d'alignement du texte ni de boutons d'indentation dans la barre flottante.** Notion n'en a pas ; Tab et Maj+Tab indentent.
+- **Bloc de code sans coloration syntaxique.** Elle demande `@blocknote/code-block` et Shiki (plusieurs centaines de Ko) ; à ajouter si le besoin se fait sentir.
+- **Le texte de l'éditeur s'aligne sur le titre ; le « + » et la poignée vivent dans une marge de 56 px de chaque côté de la colonne de 700 px.** Spec 6.3c : la marge gauche est la zone des outils.
+- **Le document est lu au moment de l'envoi (500 ms après la dernière modification), et un document identique au dernier envoyé ne part pas.** Rien n'est recopié à chaque lettre, et ouvrir une page n'écrit jamais sur le serveur (sinon chaque ouverture créerait une version).
+- **Une version plus récente reçue du serveur remplace le contenu affiché seulement si rien n'attend d'être envoyé et que personne n'écrit dans la page.** Sinon l'envoi suivant reçoit un 409 et la question « Recharger ou écraser » est posée.
+- **Un bloc d'un type inconnu s'ouvre comme un paragraphe qui garde son texte.** Une page ne doit jamais devenir illisible parce qu'elle contient un bloc d'une version future.
+- **Le serveur vérifie la forme du document (chaque bloc a un type, des enfants en tableau), pas son détail.** Le détail appartient à l'éditeur ; les liens sont neutralisés à l'affichage par BlockNote (`javascript:` et autres protocoles non autorisés donnent un lien vide).
+- **Flèche bas en fin de titre descend dans le corps ; flèche haut au début du corps remonte au titre.** Le titre et le corps se parcourent comme un seul document.
+- **Les tests du glisser-déposer de blocs attendent 700 ms avant de prendre la poignée.** L'historique d'annulation regroupe les changements faits à moins de 500 ms d'intervalle ; un utilisateur met plus longtemps à prendre la souris, et Ctrl+Z annule alors le seul déplacement.
