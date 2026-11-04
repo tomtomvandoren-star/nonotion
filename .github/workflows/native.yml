@@ -99,8 +99,13 @@ jobs:
           pnpm icons
           pnpm build:linux
 
-      # L'écran virtuel n'a pas de carte graphique : sans ces réglages, WebKitGTK affiche une
-      # fenêtre noire (son rendu DMABUF demande un GPU). Sur un vrai poste, ils ne sont pas utiles.
+      # Ubuntu 24.04 bloque les espaces de noms utilisateur dont le bac à sable de WebKitGTK a
+      # besoin : la vue web ne démarre pas. On les autorise sur cette machine de CI seulement.
+      - name: Bac à sable de WebKitGTK autorisé sur la machine de CI
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      # L'écran virtuel n'a pas de carte graphique : rendu logiciel (sinon fenêtre noire).
+      # Sur un vrai poste, ces réglages ne sont pas utiles.
       - name: Lancement dans un écran virtuel, frappe au clavier et captures
         working-directory: apps/desktop
         env:
@@ -110,14 +115,11 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE: '1'
         run: |
           xvfb-run -a -s "-screen 0 1280x800x24" bash -c '
-            ./src-tauri/target/release/nonotion &
+            ./src-tauri/target/release/nonotion > application.log 2>&1 &
             app=$!
             sleep 15
-            kill -0 "$app" || { echo "L’application s’est arrêtée au lancement"; exit 1; }
+            kill -0 "$app" || { echo "L’application s’est arrêtée au lancement"; cat application.log; exit 1; }
             echo "Fenêtres X :"; xwininfo -root -tree | grep -v "has no name" | head -20
-            window=$(xdotool search --name Nonotion | head -1)
-            echo "Fenêtre Nonotion : ${window:-introuvable}"
-            if [ -n "$window" ]; then import -window "$window" capture-0-fenetre.png; fi
             import -window root capture-1-ouverture.png
             # Un clic dans le premier paragraphe, fin de ligne, nouvelle ligne, puis « /tit » :
             # le menu des blocs doit s’ouvrir et se filtrer sur les titres.
@@ -130,6 +132,7 @@ jobs:
             sleep 2
             import -window root capture-2-frappe-et-menu.png
             kill "$app"
+            echo "Sortie de l’application :"; cat application.log
           '
 
       - uses: actions/upload-artifact@v4
