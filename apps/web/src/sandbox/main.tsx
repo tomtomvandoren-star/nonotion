@@ -49,7 +49,7 @@ if (!root) throw new Error('Élément #root introuvable')
 createRoot(root).render(
   <StrictMode>
     <main
-      className="mx-auto w-full max-w-[812px] px-4 pt-[max(2rem,env(safe-area-inset-top))] pb-40 md:px-14"
+      className="mx-auto w-full max-w-[812px] pt-[max(2rem,env(safe-area-inset-top))] pr-4 pb-40 pl-10 md:px-14"
       style={{ paddingBottom: 'max(10rem, env(safe-area-inset-bottom))' }}
     >
       <p className="mb-6 text-xs text-muted-foreground">

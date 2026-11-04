@@ -314,3 +314,41 @@ test.describe('Conflit entre deux appareils', () => {
     await expect(editorOf(page)).toHaveText('Écrit ici')
   })
 })
+
+test.describe('6.3b Raccourcis Markdown au clavier d’un téléphone', () => {
+  // Les claviers virtuels (Gboard…) regroupent la frappe en mots validés d'un coup. Chromium sait
+  // simuler cette « composition » ; c'est elle qui empêchait les raccourcis sur Android.
+  test('le raccourci et le mot suivant validés ensemble donnent le bon bloc', async ({
+    page,
+    request,
+    browserName,
+  }) => {
+    test.skip(browserName !== 'chromium', 'simulation de clavier virtuel propre à Chromium')
+    await openEmptyPage(page, request)
+    const cdp = await page.context().newCDPSession(page)
+    const composeWord = async (word: string) => {
+      for (let i = 1; i <= word.length; i++)
+        await cdp.send('Input.imeSetComposition', {
+          text: word.slice(0, i),
+          selectionStart: i,
+          selectionEnd: i,
+        })
+      await cdp.send('Input.insertText', { text: word })
+    }
+
+    await composeWord('# Titre')
+    await expect.poll(() => editorBlocks(page)).toEqual([['heading:1', 'Titre']])
+
+    await page.keyboard.press('Enter')
+    await composeWord('[] Lait')
+    await expect.poll(() => editorBlocks(page)).toContainEqual(['checkListItem', 'Lait'])
+
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('Enter')
+    await composeWord('Du **gras** ')
+    await expect(editorOf(page).locator('strong')).toHaveText('gras')
+
+    await composeWord('et du `code` ')
+    await expect(editorOf(page).locator('code')).toHaveText('code')
+  })
+})

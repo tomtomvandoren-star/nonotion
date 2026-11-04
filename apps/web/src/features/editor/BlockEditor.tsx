@@ -20,7 +20,9 @@ import { useEffect, useImperativeHandle, useRef } from 'react'
 import { BlockSideMenu, SelectionToolbar } from './BlockMenus'
 import { BLOCK_CHOICES, filterChoices } from './blockChoices'
 import { toEditorContent } from './content'
+import { createMarkdownFallback } from './markdownFallback'
 import type { NonotionBlock, NonotionEditor, NonotionPartialBlock } from './schema'
+import { SIDE_MENU_FLOATING } from './sideMenuPosition'
 import { BLOCK_TYPES, schema } from './schema'
 
 export type BlockEditorHandle = {
@@ -150,6 +152,7 @@ export default function BlockEditor({
     // La ligne qui montre où le bloc glissé va tomber (P4), dans la couleur d'accent.
     dropCursor: { color: 'var(--accent)', width: 3 },
     extensions: [
+      createMarkdownFallback(continueAfterDivider),
       createExtension({
         key: 'nonotion-shortcuts',
         // Nos règles passent avant celles de BlockNote, qui font de « > » une citation.
@@ -206,7 +209,7 @@ export default function BlockEditor({
         shouldOpen={opensSlashMenu}
         getItems={async (query) => filterChoices(slashMenuItems(editor), query)}
       />
-      <SideMenuController sideMenu={BlockSideMenu} />
+      <SideMenuController sideMenu={BlockSideMenu} floatingUIOptions={SIDE_MENU_FLOATING} />
       <FormattingToolbarController formattingToolbar={SelectionToolbar} />
     </BlockNoteView>
   )

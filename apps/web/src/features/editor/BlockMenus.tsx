@@ -14,7 +14,9 @@ import {
   useComponentsContext,
   useExtensionState,
   usePortalElement,
+  useUIMode,
 } from '@blocknote/react'
+import { Redo2, Undo2 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { BLOCK_CHOICES } from './blockChoices'
 import { withoutIds } from './content'
@@ -115,8 +117,12 @@ const BLOCK_TYPE_ITEMS: BlockTypeSelectItem[] = TEXT_CHOICES.map((choice) => ({
  * du clavier (spec 7, responsive).
  */
 export function SelectionToolbar() {
+  const mobile = useUIMode() === 'mobile'
   return (
     <FormattingToolbar>
+      {/* Pas de Ctrl+Z sur un téléphone : annuler et rétablir sont des boutons (spec 6.14). */}
+      {mobile && <HistoryButton key="undoButton" direction="undo" />}
+      {mobile && <HistoryButton key="redoButton" direction="redo" />}
       <BlockTypeSelect key="blockTypeSelect" items={BLOCK_TYPE_ITEMS} />
       <CreateLinkButton key="createLinkButton" />
       <BasicTextStyleButton basicTextStyle="bold" key="boldStyleButton" />
@@ -126,5 +132,26 @@ export function SelectionToolbar() {
       <BasicTextStyleButton basicTextStyle="code" key="codeStyleButton" />
       <ColorStyleButton key="colorStyleButton" />
     </FormattingToolbar>
+  )
+}
+
+function HistoryButton({ direction }: { direction: 'undo' | 'redo' }) {
+  const Components = useComponentsContext()
+  const editor = useBlockNoteEditor() as NonotionEditor
+  if (!Components) return null
+  const label = direction === 'undo' ? 'Annuler' : 'Rétablir'
+  const Icon = direction === 'undo' ? Undo2 : Redo2
+
+  return (
+    <Components.FormattingToolbar.Button
+      className="bn-button"
+      label={label}
+      mainTooltip={label}
+      icon={<Icon aria-hidden size={16} />}
+      onClick={() => {
+        if (direction === 'undo') editor.undo()
+        else editor.redo()
+      }}
+    />
   )
 }

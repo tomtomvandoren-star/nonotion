@@ -239,3 +239,10 @@
   flex: 1;
   min-width: 0;
 }
+
+/* Sur téléphone, la marge gauche ne loge que la poignée : on insère un bloc avec Entrée ou « / ». */
+@media (max-width: 767px) {
+  .bn-side-menu .bn-button:has([data-test='dragHandleAdd']) {
+    display: none;
+  }
+}

@@ -96,8 +96,9 @@ function PageDocument({ page }: { page: PageDetail }) {
         </div>
       )}
 
-      {/* Texte sur 700 px au plus ; les marges de 56 px accueillent le « + » et la poignée des blocs. */}
-      <div className="mx-auto w-full max-w-[812px] px-4 md:px-14">
+      {/* Texte sur 700 px au plus ; les marges de 56 px accueillent le « + » et la poignée des blocs
+          (40 px à gauche sur téléphone, où seule la poignée reste). */}
+      <div className="mx-auto w-full max-w-[812px] pr-4 pl-10 md:px-14">
         <header className={cn('group/header', cover ? 'pt-0' : 'pt-16')}>
           {page.icon && (
             <IconPicker
