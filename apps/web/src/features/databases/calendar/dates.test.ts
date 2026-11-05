@@ -1,5 +1,5 @@
 import type { DatabaseRowData, DateValue } from '@nonotion/shared'
-import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import {
   addDays,
   addMonths,
@@ -16,10 +16,8 @@ import {
   weekDays,
 } from './dates'
 
-// Les heures locales de ces tests sont celles de Bruxelles (UTC+1 l'hiver, UTC+2 l'été).
-beforeAll(() => {
-  vi.stubEnv('TZ', 'Europe/Brussels')
-})
+// Les heures locales de ces tests sont celles de Bruxelles (UTC+1 l'hiver, UTC+2 l'été) : voir
+// `test.env` dans vite.config.ts.
 
 const row = (id: string, position = id): DatabaseRowData => ({
   id,

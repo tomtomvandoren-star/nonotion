@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { fileURLToPath } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
@@ -17,5 +18,10 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+  },
+  test: {
+    // Les heures locales des tests sont celles de Bruxelles (changement d'heure compris), quel que
+    // soit le fuseau de la machine : la CI tourne en UTC.
+    env: { TZ: 'Europe/Brussels' },
   },
 })
