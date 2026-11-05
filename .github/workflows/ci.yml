@@ -68,10 +68,39 @@ jobs:
       - name: Tests unitaires (Vitest, Pest)
         run: pnpm test
 
-      # Étape à part : le miroir Ubuntu est parfois très lent, ce temps ne doit pas manger celui des tests.
+      # Les navigateurs et leurs paquets système sont gardés d'une exécution à l'autre : le miroir
+      # Ubuntu est parfois si lent (60 ko/s) que leur seul téléchargement dépassait le temps des tests.
+      - name: Version de Playwright
+        id: playwright
+        run: echo "version=$(pnpm exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Navigateurs de test en cache
+        id: browsers-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/.cache/playwright-apt
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
       - name: Navigateurs de test (Playwright)
         timeout-minutes: 25
-        run: pnpm exec playwright install --with-deps chromium firefox webkit
+        run: |
+          mkdir -p ~/.cache/playwright-apt
+          # Paquets déjà téléchargés une fois : apt les prend ici plutôt que sur le miroir.
+          sudo cp ~/.cache/playwright-apt/*.deb /var/cache/apt/archives/ 2>/dev/null || true
+          pnpm exec playwright install --with-deps chromium firefox webkit
+          cp /var/cache/apt/archives/*.deb ~/.cache/playwright-apt/ 2>/dev/null || true
+
+      # Enregistré tout de suite (pas en fin de travail) : même si un test échoue ensuite.
+      - name: Mise en cache des navigateurs de test
+        if: steps.browsers-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cache/ms-playwright
+            ~/.cache/playwright-apt
+          key: ${{ steps.browsers-cache.outputs.cache-primary-key }}
 
       - name: Tests de bout en bout (Chromium, Firefox, WebKit)
         timeout-minutes: 12
