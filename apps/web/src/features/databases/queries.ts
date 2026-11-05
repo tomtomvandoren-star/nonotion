@@ -2,6 +2,7 @@ import type {
   DatabaseDetail,
   DatabaseRowData,
   DatabaseView,
+  DateValue,
   PageDetail,
   Property,
   ViewConfig,
@@ -24,11 +25,25 @@ import {
   updateRow,
   updateView,
 } from '@/lib/api/databases'
+import { formatDate } from './values'
 
 export const databaseKey = (databaseId: string) => ['database', databaseId] as const
 
 /** Configurations de vues modifiées ici et pas encore envoyées (voir useUpdateViewConfig). */
-const pendingConfigs = new Map<string, ReturnType<typeof setTimeout>>()
+const pendingConfigs = new Map<string, { timer: ReturnType<typeof setTimeout>; send: () => void }>()
+
+/** Quitter, recharger ou masquer la page envoie tout de suite ce qui attendait encore. */
+function flushPendingConfigs() {
+  for (const [viewId, pending] of pendingConfigs) {
+    clearTimeout(pending.timer)
+    pendingConfigs.delete(viewId)
+    pending.send()
+  }
+}
+window.addEventListener('pagehide', flushPendingConfigs)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushPendingConfigs()
+})
 
 /** Même rythme que l'arbre : rafraîchissement à la place du temps réel (spec 1.3.6). */
 const SYNC_INTERVAL_MS = 60_000
@@ -56,7 +71,7 @@ function patchDatabase(
   return () => queryClient.setQueryData(key, previous)
 }
 
-/** Titre ou valeurs d'une ligne, appliqués au cache (base et page) ; renvoie de quoi annuler. */
+/** Titre, valeurs ou place d'une ligne, appliqués au cache (base et page) ; renvoie de quoi annuler. */
 export function applyRowPatchLocally(
   queryClient: QueryClient,
   databaseId: string,
@@ -69,6 +84,7 @@ export function applyRowPatchLocally(
     ...row,
     ...(patch.title !== undefined ? { title: patch.title } : {}),
     ...(patch.properties ? { properties: { ...row.properties, ...patch.properties } } : {}),
+    ...(patch.position !== undefined ? { position: patch.position } : {}),
   })
   const undoDatabase = patchDatabase(queryClient, databaseId, (database) => ({
     ...database,
@@ -84,6 +100,21 @@ export function applyRowPatchLocally(
   }
 }
 
+/** « Prochaine occurrence : 12 nov. 2026 » (la première date qui se répète). */
+function nextOccurrenceMessage(
+  queryClient: QueryClient,
+  databaseId: string,
+  row: DatabaseRowData,
+): string {
+  const schema = queryClient.getQueryData<DatabaseDetail>(databaseKey(databaseId))?.schema ?? []
+  for (const property of schema) {
+    const value = row.properties[property.id] as DateValue | null | undefined
+    if (property.type === 'date' && value?.repeat)
+      return `Prochaine occurrence : ${formatDate(value)}`
+  }
+  return 'Prochaine occurrence créée.'
+}
+
 /** Titre ou valeurs d'une ligne : affichés tout de suite partout (tableau, aperçu, autres vues). */
 export function useUpdateRow(databaseId: string) {
   const queryClient = useQueryClient()
@@ -91,12 +122,25 @@ export function useUpdateRow(databaseId: string) {
     mutationKey: SAVE_MUTATION_KEY,
     mutationFn: ({ rowId, patch }: { rowId: string; patch: RowPatch }) => updateRow(rowId, patch),
     onMutate: async ({ rowId, patch }) => {
+      // Tout de suite (une case cochée ne revient pas en arrière le temps d'un aller-retour)…
+      const undo = applyRowPatchLocally(queryClient, databaseId, rowId, patch)
+      // … et encore après avoir annulé un rafraîchissement en cours, qui remet l'état d'avant.
       await queryClient.cancelQueries({ queryKey: databaseKey(databaseId) })
-      return { undo: applyRowPatchLocally(queryClient, databaseId, rowId, patch) }
+      applyRowPatchLocally(queryClient, databaseId, rowId, patch)
+      return { undo }
     },
     // Un rafraîchissement a pu ramener l'ancienne valeur entre-temps : on reporte la nôtre.
-    onSuccess: (_saved, { rowId, patch }) => {
+    onSuccess: ({ data, created }, { rowId, patch }) => {
       applyRowPatchLocally(queryClient, databaseId, rowId, patch)
+      if (created) {
+        // Tâche récurrente terminée (spec 6.7) : elle perd sa répétition, la suivante apparaît.
+        applyRowPatchLocally(queryClient, databaseId, rowId, { properties: data.properties })
+        patchDatabase(queryClient, databaseId, (database) => ({
+          ...database,
+          rows: [...database.rows.filter((row) => row.id !== created.id), created],
+        }))
+        toast.success(nextOccurrenceMessage(queryClient, databaseId, created))
+      }
     },
     onError: (_error, _input, context) => {
       context?.undo()
@@ -213,8 +257,9 @@ export function useUpdateViewConfig(databaseId: string) {
   const queryClient = useQueryClient()
   const save = useMutation({
     mutationKey: SAVE_MUTATION_KEY,
+    // keepalive : la requête survit à un rechargement juste après le changement.
     mutationFn: ({ viewId, config }: { viewId: string; config: ViewConfig }) =>
-      updateView(viewId, { config }),
+      updateView(viewId, { config }, { keepalive: true }),
     onError: () => {
       void queryClient.invalidateQueries({ queryKey: databaseKey(databaseId) })
       toast.error('La vue n’a pas pu être enregistrée.')
@@ -223,14 +268,15 @@ export function useUpdateViewConfig(databaseId: string) {
 
   return (view: DatabaseView, config: ViewConfig) => {
     replaceView(queryClient, databaseId, { ...view, config })
-    clearTimeout(pendingConfigs.get(view.id))
-    pendingConfigs.set(
-      view.id,
-      setTimeout(() => {
+    clearTimeout(pendingConfigs.get(view.id)?.timer)
+    const send = () => save.mutate({ viewId: view.id, config })
+    pendingConfigs.set(view.id, {
+      send,
+      timer: setTimeout(() => {
         pendingConfigs.delete(view.id)
-        save.mutate({ viewId: view.id, config })
+        send()
       }, 400),
-    )
+    })
   }
 }
 

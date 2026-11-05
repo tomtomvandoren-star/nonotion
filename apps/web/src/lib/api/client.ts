@@ -42,12 +42,16 @@ export function apiUrl(path: string, base: string = API_URL): string {
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
-/** Requête JSON ; la réponse est validée par un schéma Zod, pour ne jamais accepter de données inattendues. */
+/**
+ * Requête JSON ; la réponse est validée par un schéma Zod, pour ne jamais accepter de données inattendues.
+ * `keepalive` : la requête part même si la page se ferme ou se recharge entre-temps.
+ */
 export async function apiRequest<T>(
   method: Method,
   path: string,
   schema: z.ZodType<T>,
   body?: unknown,
+  { keepalive = false }: { keepalive?: boolean } = {},
 ): Promise<T> {
   const token = getToken()
   const headers: Record<string, string> = { Accept: 'application/json' }
@@ -58,6 +62,7 @@ export async function apiRequest<T>(
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
+    keepalive,
   })
 
   const data: unknown = response.status === 204 ? null : await response.json().catch(() => null)

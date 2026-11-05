@@ -15,10 +15,13 @@ const dataOf = <T extends z.ZodType>(schema: T) => z.object({ data: schema })
 export const fetchDatabase = (databaseId: string) =>
   apiGet(`databases/${databaseId}`, dataOf(databaseDetailSchema)).then((r) => r.data)
 
-/** Une nouvelle base : en ligne dans `pageId`, ou dans une nouvelle sous-page (pleine page). */
+/**
+ * Une nouvelle base : en ligne dans `pageId`, ou dans une nouvelle sous-page (pleine page).
+ * `template: 'tasks'` crée le Gestionnaire de tâches (spec 6.7).
+ */
 export const createDatabase = (
   workspaceId: string,
-  input: { page_id: string; full_page?: boolean; title?: string },
+  input: { page_id: string; full_page?: boolean; title?: string; template?: 'tasks' },
 ) =>
   apiRequest(
     'POST',
@@ -38,16 +41,23 @@ export const createRow = (
     (r) => r.data,
   )
 
-export type RowPatch = { title?: string; properties?: Record<string, unknown> }
+/** Ce qui change d'une ligne : son titre, des valeurs, ou sa place (glisser une carte). */
+export type RowPatch = { title?: string; properties?: Record<string, unknown>; position?: string }
 
-/** Titre ou valeurs d'une ligne : seules les propriétés envoyées changent. */
+/**
+ * Titre ou valeurs d'une ligne : seules les propriétés envoyées changent. `created` : la prochaine
+ * occurrence d'une tâche récurrente qui vient d'être terminée (spec 6.7).
+ */
 export const updateRow = (rowId: string, patch: RowPatch) =>
   apiRequest(
     'PATCH',
     `pages/${rowId}`,
-    dataOf(z.object({ id: z.string(), properties: z.record(z.string(), z.unknown()) })),
+    z.object({
+      data: z.object({ id: z.string(), properties: z.record(z.string(), z.unknown()) }),
+      created: databaseRowSchema.optional(),
+    }),
     patch,
-  ).then((r) => r.data)
+  )
 
 export const addProperty = (databaseId: string, property: Property) =>
   apiRequest('POST', `databases/${databaseId}/properties`, dataOf(databaseDetailSchema), {
@@ -80,7 +90,11 @@ export const createView = (
 export const updateView = (
   viewId: string,
   patch: { name?: string; config?: ViewConfig; position?: string },
-) => apiRequest('PATCH', `views/${viewId}`, dataOf(databaseViewSchema), patch).then((r) => r.data)
+  options?: { keepalive?: boolean },
+) =>
+  apiRequest('PATCH', `views/${viewId}`, dataOf(databaseViewSchema), patch, options).then(
+    (r) => r.data,
+  )
 
 export const duplicateView = (viewId: string) =>
   apiRequest('POST', `views/${viewId}/duplicate`, dataOf(databaseViewSchema)).then((r) => r.data)

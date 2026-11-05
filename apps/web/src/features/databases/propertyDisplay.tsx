@@ -4,6 +4,7 @@ import {
   type Property,
   type PropertyOption,
   type PropertyType,
+  repeatLabel,
 } from '@nonotion/shared'
 import {
   AlignLeft,
@@ -12,11 +13,13 @@ import {
   CircleDashed,
   Hash,
   type LucideIcon,
+  Repeat,
   SquareCheck,
   Tags,
   Type,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { formatDate } from './values'
 
 const PROPERTY_ICONS: Record<PropertyType, LucideIcon> = {
   title: Type,
@@ -52,27 +55,6 @@ export function OptionPill({
   )
 }
 
-const dayFormat = new Intl.DateTimeFormat('fr-FR', {
-  day: 'numeric',
-  month: 'short',
-  year: 'numeric',
-})
-const timeFormat = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' })
-
-/** « 5 nov. 2026 », « 5 nov. 2026 14:30 », « 5 nov. 2026 → 7 nov. 2026 ». */
-function formatDate(value: DateValue): string {
-  const one = (text: string) => {
-    if (!text.includes('T')) {
-      const [year, month, day] = text.split('-').map(Number) as [number, number, number]
-      // Journée entière : jamais convertie de fuseau (spec 6.8).
-      return dayFormat.format(new Date(year, month - 1, day))
-    }
-    const date = new Date(text)
-    return `${dayFormat.format(date)} ${timeFormat.format(date)}`
-  }
-  return value.end ? `${one(value.start)} → ${one(value.end)}` : one(value.start)
-}
-
 const numberFormat = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 10 })
 
 /** La valeur d'une propriété en lecture, pour une cellule, une carte ou la grille d'une page. */
@@ -100,8 +82,22 @@ export function PropertyValueView({
     case 'date': {
       const date = value as DateValue | null | undefined
       return date ? (
-        <span className={cn('whitespace-nowrap', hasTime(date) && 'tabular-nums')}>
+        <span
+          className={cn(
+            'inline-flex items-center gap-1 whitespace-nowrap',
+            hasTime(date) && 'tabular-nums',
+          )}
+        >
           {formatDate(date)}
+          {date.repeat && (
+            <Repeat
+              role="img"
+              aria-label={repeatLabel(date.repeat)}
+              className="size-3 shrink-0 text-muted-foreground"
+            >
+              <title>{repeatLabel(date.repeat)}</title>
+            </Repeat>
+          )}
         </span>
       ) : null
     }

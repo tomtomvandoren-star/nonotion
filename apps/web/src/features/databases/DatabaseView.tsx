@@ -15,6 +15,7 @@ import { useMemo, useState } from 'react'
 import { requestTitleFocus } from '@/features/pages/useNewPage'
 import { ApiError } from '@/lib/api/client'
 import { useUi } from '@/stores/ui'
+import { BoardView } from './BoardView'
 import type { ColumnAction } from './ColumnHeader'
 import { visibleColumns } from './columns'
 import { newRule } from './filterLabels'
@@ -163,8 +164,18 @@ function LoadedDatabase({ database, showTitle }: { database: DatabaseDetail; sho
         <ListView {...body} />
       ) : view.type === 'gallery' ? (
         <GalleryView {...body} />
+      ) : view.type === 'board' ? (
+        <BoardView {...body} />
       ) : (
-        <TableView {...body} />
+        <>
+          {view.type === 'calendar' && (
+            // La vue Calendrier arrive à la phase 5 ; ses éléments restent visibles en attendant.
+            <p className="mb-1 text-xs text-muted-foreground">
+              L’affichage en calendrier arrive bientôt : en attendant, les éléments sont en tableau.
+            </p>
+          )}
+          <TableView {...body} />
+        </>
       )}
       {peek && (
         <RowPeek

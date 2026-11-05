@@ -2,9 +2,13 @@ import {
   type DateValue,
   hasTime,
   newId,
-  OPTION_COLORS,
+  nextOptionColor,
   type PropertyOption,
   type PropertyWithOptions,
+  type Repeat,
+  REPEAT_UNITS,
+  type RepeatUnit,
+  repeatLabel,
   STATUS_GROUPS,
   type StatusGroup,
 } from '@nonotion/shared'
@@ -147,6 +151,7 @@ export function DateEditor({
     endTime?: string
     time?: boolean
     hasEnd?: boolean
+    repeat?: Repeat | null
   }): DateValue | null => {
     const startDay = next.startDay ?? start.day
     if (!startDay) return null
@@ -163,7 +168,8 @@ export function DateEditor({
       (time ? Date.parse(endValue) < Date.parse(startValue) : endValue < startValue)
     )
       endValue = startValue
-    return { start: startValue, end: endValue }
+    const repeat = next.repeat === undefined ? value?.repeat : next.repeat
+    return { start: startValue, end: endValue, ...(repeat ? { repeat } : {}) }
   }
 
   const fieldClass =
@@ -245,6 +251,12 @@ export function DateEditor({
         />
         Inclure l’heure
       </label>
+      <RepeatField
+        value={value?.repeat ?? null}
+        disabled={!value}
+        onChange={(repeat) => onChange(build({ repeat }))}
+        fieldClass={fieldClass}
+      />
       <div className="flex justify-between pt-1">
         <button
           type="button"
@@ -261,6 +273,90 @@ export function DateEditor({
           OK
         </button>
       </div>
+    </div>
+  )
+}
+
+const UNIT_NAMES: Record<RepeatUnit, string> = {
+  day: 'jours',
+  week: 'semaines',
+  month: 'mois',
+  year: 'ans',
+}
+
+/**
+ * « Répéter » (spec 6.7) : tous les jours, semaines, mois, ans, ou « personnalisé » (tous les N …).
+ * Quand la tâche passe à « Terminé », le serveur crée la suivante.
+ */
+function RepeatField({
+  value,
+  disabled,
+  onChange,
+  fieldClass,
+}: {
+  value: Repeat | null
+  disabled: boolean
+  onChange: (repeat: Repeat | null) => void
+  fieldClass: string
+}) {
+  const [custom, setCustom] = useState(value !== null && value.interval !== 1)
+  const choice = value === null ? 'none' : custom ? 'custom' : value.unit
+
+  return (
+    <div className="grid gap-1 text-xs text-muted-foreground">
+      <label className="grid gap-1">
+        Répéter
+        <select
+          aria-label="Répéter"
+          value={choice}
+          disabled={disabled}
+          onChange={(event) => {
+            const next = event.target.value
+            setCustom(next === 'custom')
+            if (next === 'none') onChange(null)
+            else if (next === 'custom') onChange({ unit: value?.unit ?? 'week', interval: 2 })
+            else onChange({ unit: next as RepeatUnit, interval: 1 })
+          }}
+          className={cn(fieldClass, 'text-foreground')}
+        >
+          <option value="none">Jamais</option>
+          {REPEAT_UNITS.map((unit) => (
+            <option key={unit} value={unit}>
+              {repeatLabel({ unit, interval: 1 })}
+            </option>
+          ))}
+          <option value="custom">Personnalisé…</option>
+        </select>
+      </label>
+      {choice === 'custom' && value && (
+        <div className="flex items-center gap-1 text-sm text-foreground">
+          Tous les
+          <input
+            type="number"
+            aria-label="Intervalle de répétition"
+            min={1}
+            max={365}
+            value={value.interval}
+            onChange={(event) => {
+              const interval = Math.round(Number(event.target.value))
+              if (interval >= 1 && interval <= 365) onChange({ ...value, interval })
+            }}
+            className={cn(fieldClass, 'w-16')}
+          />
+          <select
+            aria-label="Unité de répétition"
+            value={value.unit}
+            onChange={(event) => onChange({ ...value, unit: event.target.value as RepeatUnit })}
+            className={cn(fieldClass, 'min-w-0 flex-1')}
+          >
+            {REPEAT_UNITS.map((unit) => (
+              <option key={unit} value={unit}>
+                {UNIT_NAMES[unit]}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
     </div>
   )
 }
@@ -328,14 +424,10 @@ export function OptionPicker({
     setActive(0)
     let id: string
     if (item.kind === 'create') {
-      const used = new Set(property.options.map((option) => option.color))
-      const color =
-        OPTION_COLORS.find((c) => c !== 'default' && !used.has(c)) ??
-        OPTION_COLORS[(property.options.length % (OPTION_COLORS.length - 1)) + 1]!
       const option: PropertyOption & { group?: StatusGroup } = {
         id: newId(),
         name: item.name.slice(0, 100),
-        color,
+        color: nextOptionColor(property.options),
         ...(property.type === 'status' ? { group: 'todo' as const } : {}),
       }
       await onCreateOption(option)

@@ -285,8 +285,8 @@ function PageBody({
 
   /** « /base de données » (spec 6.4) : en ligne dans cette page, ou dans une nouvelle sous-page. */
   const databases: DatabaseActions = {
-    createInline: async () => {
-      const { data } = await createDatabase(workspaceId, { page_id: page.id })
+    createInline: async (template) => {
+      const { data } = await createDatabase(workspaceId, { page_id: page.id, template })
       queryClient.setQueryData(databaseKey(data.id), data)
       return data.id
     },

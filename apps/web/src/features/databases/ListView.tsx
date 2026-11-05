@@ -1,11 +1,13 @@
-import { type DatabaseRowData, isEmptyValue, type Property, type RowGroup } from '@nonotion/shared'
+import type { DatabaseRowData, RowGroup } from '@nonotion/shared'
 import { useState } from 'react'
 import { PageGlyph } from '@/features/pages/PageGlyph'
 import { displayTitle } from '@/features/pages/displayTitle'
 import { cn } from '@/lib/utils'
-import { visibleColumns } from './columns'
+import { filledProperties, visibleColumns } from './columns'
 import { NewItemInput } from './NewItemInput'
 import { OptionPill, PropertyValueView } from './propertyDisplay'
+import { useCompletion } from './completion'
+import { TaskCheckbox } from './TaskCheckbox'
 import type { ViewBodyProps } from './viewTypes'
 
 type Section = { group: RowGroup<DatabaseRowData> | null; rows: DatabaseRowData[]; key: string }
@@ -29,20 +31,10 @@ function SectionHeader({ group }: { group: RowGroup<DatabaseRowData> }) {
   )
 }
 
-/** Les propriétés visibles d'un élément qui ont une valeur (on n'affiche pas de cases vides). */
-function filledProperties(row: DatabaseRowData, columns: Property[]) {
-  return columns.filter(
-    (property) =>
-      property.type !== 'title' &&
-      (property.type === 'checkbox'
-        ? row.properties[property.id] === true
-        : !isEmptyValue(row.properties[property.id])),
-  )
-}
-
 /** Vue Liste : une ligne par élément, son titre et, à droite, ses propriétés visibles. */
 export function ListView({ database, view, rows, groups, onOpenRow, inherited }: ViewBodyProps) {
   const columns = visibleColumns(database.schema, view.config)
+  const completion = useCompletion(database)
   const [draftIn, setDraftIn] = useState<string | null>(null)
 
   return (
@@ -55,14 +47,20 @@ export function ListView({ database, view, rows, groups, onOpenRow, inherited }:
         <section key={key}>
           {group && <SectionHeader group={group} />}
           {sectionRows.map((row) => (
-            <div role="listitem" key={row.id} className="border-b border-border">
+            <div
+              role="listitem"
+              key={row.id}
+              data-done={completion?.isDone(row) || undefined}
+              className="flex items-center border-b border-border hover:bg-accent"
+            >
+              {completion && <TaskCheckbox row={row} completion={completion} className="ml-2" />}
               <button
                 type="button"
                 onClick={() => onOpenRow(row.id)}
-                className="flex min-h-9 w-full items-center gap-2 px-2 py-1 text-left hover:bg-accent"
+                className="flex min-h-9 min-w-0 flex-1 items-center gap-2 px-2 py-1 text-left"
               >
                 <PageGlyph icon={row.icon} className="text-sm" />
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                <span className="nn-task-title min-w-0 flex-1 truncate text-sm font-medium">
                   {displayTitle(row.title)}
                 </span>
                 <span className="flex min-w-0 shrink items-center gap-2 overflow-hidden text-sm text-muted-foreground">

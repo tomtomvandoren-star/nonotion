@@ -182,6 +182,81 @@
     {
       "property": "date",
       "value": {
+        "start": "2026-11-05",
+        "repeat": {
+          "unit": "week",
+          "interval": 1
+        }
+      },
+      "valid": true
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05T09:00:00Z",
+        "repeat": {
+          "unit": "month",
+          "interval": 3
+        }
+      },
+      "valid": true
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05",
+        "repeat": null
+      },
+      "valid": true
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05",
+        "repeat": {
+          "unit": "hour",
+          "interval": 1
+        }
+      },
+      "valid": false
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05",
+        "repeat": {
+          "unit": "day",
+          "interval": 0
+        }
+      },
+      "valid": false
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05",
+        "repeat": {
+          "unit": "day",
+          "interval": 1.5
+        }
+      },
+      "valid": false
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05",
+        "repeat": {
+          "unit": "day",
+          "interval": 1,
+          "until": "2027-01-01"
+        }
+      },
+      "valid": false
+    },
+    {
+      "property": "date",
+      "value": {
         "start": "2026-11-05T25:00:00Z"
       },
       "valid": false

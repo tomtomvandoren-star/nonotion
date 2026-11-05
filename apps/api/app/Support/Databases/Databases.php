@@ -29,14 +29,20 @@ class Databases
     }
 
     /**
-     * Une nouvelle base : la propriété Titre, une vue Tableau et trois lignes vides (spec 6.4).
+     * Une nouvelle base : la propriété Titre, une vue Tableau et trois lignes vides (spec 6.4), ou
+     * le modèle demandé (« tasks » : le Gestionnaire de tâches, spec 6.7).
      * En pleine page, elle vit dans une nouvelle sous-page de $host, dont elle est tout le contenu.
      *
      * @return array{0: Database, 1: Page} la base et la page qui la contient
      */
-    public static function create(Page $host, bool $fullPage, ?string $title): array
+    public static function create(Page $host, bool $fullPage, ?string $title, ?string $template = null): array
     {
-        return DB::transaction(function () use ($host, $fullPage, $title) {
+        $tasks = $template === TaskTemplate::NAME;
+        $title ??= $tasks ? 'Tâches' : null;
+        $schema = $tasks ? TaskTemplate::schema() : PropertySchema::initial();
+        $views = $tasks ? TaskTemplate::views($schema) : [['name' => 'Tableau', 'type' => 'table', 'config' => []]];
+
+        return DB::transaction(function () use ($host, $fullPage, $title, $schema, $views) {
             $container = $host;
             if ($fullPage) {
                 $container = Page::create([
@@ -51,17 +57,14 @@ class Databases
                 'workspace_id' => $host->workspace_id,
                 'page_id' => $container->id,
                 'title' => $title ?? '',
-                'schema' => PropertySchema::initial(),
+                'schema' => $schema,
             ]);
 
-            View::create([
-                'workspace_id' => $host->workspace_id,
-                'database_id' => $database->id,
-                'name' => 'Tableau',
-                'type' => 'table',
-                'position' => FractionalIndex::between(null, null),
-                'config' => [],
-            ]);
+            $position = null;
+            foreach ($views as $view) {
+                $position = FractionalIndex::between($position, null);
+                View::create([...$view, 'workspace_id' => $host->workspace_id, 'database_id' => $database->id, 'position' => $position]);
+            }
 
             $position = null;
             for ($i = 0; $i < 3; $i++) {
@@ -78,7 +81,10 @@ class Databases
     }
 
     /**
-     * @param  array{title?: string|null, properties?: array<string, mixed>, position?: string}  $attributes
+     * Une nouvelle ligne. Un Statut non précisé prend sa première option « À faire » : une tâche
+     * qu'on vient d'ajouter est à faire, pas « sans statut ».
+     *
+     * @param  array{title?: string|null, properties?: array<string, mixed>, position?: string|null}  $attributes
      */
     public static function createRow(Database $database, array $attributes): Page
     {
@@ -88,9 +94,26 @@ class Databases
             'title' => $attributes['title'] ?? '',
             'position' => $attributes['position'] ?? self::positionAtEnd($database),
         ]);
-        $row->forceFill(['database_id' => $database->id, 'properties' => $attributes['properties'] ?? []])->save();
+        $properties = [...self::defaultValues($database), ...($attributes['properties'] ?? [])];
+        $row->forceFill(['database_id' => $database->id, 'properties' => $properties])->save();
 
         return $row;
+    }
+
+    /** @return array<string, mixed> */
+    private static function defaultValues(Database $database): array
+    {
+        $values = [];
+        foreach ($database->schema ?? [] as $property) {
+            if ($property['type'] === 'status') {
+                $todo = collect($property['options'])->firstWhere('group', 'todo');
+                if ($todo !== null) {
+                    $values[$property['id']] = $todo['id'];
+                }
+            }
+        }
+
+        return $values;
     }
 
     public static function positionAtEnd(Database $database): string

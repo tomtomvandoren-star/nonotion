@@ -37,6 +37,8 @@ class ViewConfigRules
             "{$prefix}.group_by" => ['sometimes', 'nullable', 'array'],
             "{$prefix}.group_by.property" => ["required_with:{$prefix}.group_by", 'string', $id],
             "{$prefix}.group_by.hide_empty" => ['sometimes', 'boolean'],
+            "{$prefix}.group_by.hidden" => ['sometimes', 'array', 'list', 'max:200'],
+            "{$prefix}.group_by.hidden.*" => ['string', 'max:32'],
             "{$prefix}.visible_properties" => ['sometimes', 'array', 'list', 'max:100'],
             "{$prefix}.visible_properties.*" => ['string', $id],
             "{$prefix}.property_widths" => ['sometimes', 'array', self::idKeys()],

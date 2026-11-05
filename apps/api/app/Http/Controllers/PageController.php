@@ -12,6 +12,7 @@ use App\Models\Workspace;
 use App\Support\BlockText;
 use App\Support\Databases\Databases;
 use App\Support\Databases\PageCopier;
+use App\Support\Databases\Recurrence;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -70,7 +71,8 @@ class PageController extends Controller
 
     /**
      * Titre, icône, couverture, favori, et pour une ligne de base ses valeurs de propriétés
-     * (fusionnées : seules les propriétés envoyées changent). Ne touche pas au contenu ni à sa version.
+     * (fusionnées : seules les propriétés envoyées changent) et sa place dans la base.
+     * Ne touche pas au contenu ni à sa version.
      */
     public function update(UpdatePageRequest $request, Page $page): JsonResponse
     {
@@ -81,17 +83,31 @@ class PageController extends Controller
             $attributes['title'] = $attributes['title'] ?? '';
         }
 
+        $database = null;
+        $before = $page->properties ?? [];
+        if ($request->has('position') && $page->database_id === null) {
+            throw ValidationException::withMessages(['position' => 'Pour ranger une page, déplacez-la dans l’arbre.']);
+        }
         if ($request->has('properties')) {
             $database = $page->database_id === null ? null : Database::query()->find($page->database_id);
             if ($database === null) {
                 throw ValidationException::withMessages(['properties' => 'Cette page n’est pas une ligne de base de données.']);
             }
             $values = Databases::validateValues($database, $request->input('properties', []));
-            $page->forceFill(['properties' => [...($page->properties ?? []), ...$values]]);
+            $page->forceFill(['properties' => [...$before, ...$values]]);
         }
-        $page->fill($attributes)->save();
 
-        return response()->json(['data' => [...self::treeItem($page), 'properties' => (object) ($page->properties ?? [])]]);
+        // Une tâche récurrente qui passe à « Terminé » crée sa prochaine occurrence (spec 6.7).
+        $created = DB::transaction(function () use ($page, $attributes, $database, $before) {
+            $page->fill($attributes)->save();
+
+            return $database === null ? null : Recurrence::afterUpdate($database, $page, $before);
+        });
+
+        return response()->json([
+            'data' => [...self::treeItem($page), 'properties' => (object) ($page->properties ?? [])],
+            ...($created === null ? [] : ['created' => Databases::row($created)]),
+        ]);
     }
 
     /**

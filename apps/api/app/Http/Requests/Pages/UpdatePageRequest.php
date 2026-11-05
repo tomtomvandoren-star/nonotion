@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Pages;
 
+use App\Rules\FractionalKey;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdatePageRequest extends FormRequest
@@ -17,6 +18,8 @@ class UpdatePageRequest extends FormRequest
             'is_favorite' => ['sometimes', 'boolean'],
             // Ligne de base : valeurs de propriétés, vérifiées contre le schéma (Databases::validateValues).
             'properties' => ['sometimes', 'array'],
+            // Ligne de base : sa place dans la base (glisser une carte du Board, spec 6.11).
+            'position' => ['sometimes', new FractionalKey],
         ];
     }
 }

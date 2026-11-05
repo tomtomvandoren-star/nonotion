@@ -2,7 +2,6 @@ import {
   DndContext,
   type DragEndEvent,
   type DragOverEvent,
-  PointerSensor,
   TouchSensor,
   useSensor,
   useSensors,
@@ -19,18 +18,10 @@ import { PropertyCell } from './PropertyCell'
 import { NewItemInput, type NewItemProps } from './NewItemInput'
 import { OptionPill } from './propertyDisplay'
 import { usePropertyMutation, useUpdateRow, useUpdateViewConfig } from './queries'
+import { MouseOnlyPointerSensor } from './sensors'
+import { useCompletion } from './completion'
+import { TaskCheckbox } from './TaskCheckbox'
 import type { ViewBodyProps } from './viewTypes'
-
-/** Glisser à la souris (le doigt passe par l'appui long du capteur tactile). */
-class MouseOnlyPointerSensor extends PointerSensor {
-  static activators = [
-    {
-      eventName: 'onPointerDown' as const,
-      handler: ({ nativeEvent }: React.PointerEvent) =>
-        nativeEvent.isPrimary && nativeEvent.button === 0 && nativeEvent.pointerType !== 'touch',
-    },
-  ]
-}
 
 type Editing = { rowId: string; propertyId: string } | null
 
@@ -51,6 +42,7 @@ export function TableView({
   const updateRow = useUpdateRow(database.id)
   const updateConfig = useUpdateViewConfig(database.id)
   const properties = usePropertyMutation(database.id)
+  const completion = useCompletion(database)
   const config = view.config
   const columns = visibleColumns(database.schema, config)
   const [editing, setEditing] = useState<Editing>(null)
@@ -121,7 +113,12 @@ export function TableView({
   }
 
   const renderRow = (row: DatabaseRowData, orderedRows: DatabaseRowData[]) => (
-    <tr key={row.id} data-row-id={row.id} className="group/row hover:bg-accent/40">
+    <tr
+      key={row.id}
+      data-row-id={row.id}
+      data-done={completion?.isDone(row) || undefined}
+      className="group/row hover:bg-accent/40"
+    >
       {columns.map((property) => {
         const isEditing = editing?.rowId === row.id && editing.propertyId === property.id
         const value = property.type === 'title' ? row.title : row.properties[property.id]
@@ -145,8 +142,10 @@ export function TableView({
           >
             {property.type === 'title' ? (
               <div className="flex h-full items-center">
+                {/* La case « c'est fait » en tête de ligne (spec 6.7). */}
+                {completion && <TaskCheckbox row={row} completion={completion} className="ml-2" />}
                 {row.icon && <PageGlyph icon={row.icon} className="ml-2 text-sm" />}
-                <div className="min-w-0 flex-1 font-medium">{cell}</div>
+                <div className="nn-task-title min-w-0 flex-1 font-medium">{cell}</div>
                 {!isEditing && (
                   // Au survol (P2), visible en permanence au doigt.
                   <button

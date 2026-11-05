@@ -385,7 +385,7 @@ test.describe('6.3c Poignée de bloc au doigt', () => {
     const from = (await handle.boundingBox())!
     const un = (await block('Un').boundingBox())!
     const cdp = await context.newCDPSession(page)
-    const touch = (type: string, x: number, y: number) =>
+    const touch = (type: 'touchStart' | 'touchMove' | 'touchEnd', x: number, y: number) =>
       cdp.send('Input.dispatchTouchEvent', {
         type,
         touchPoints: type === 'touchEnd' ? [] : [{ x, y }],

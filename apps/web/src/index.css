@@ -186,10 +186,24 @@
 }
 /* Au doigt, une case plus grande (spec 1.6.4). */
 @media (pointer: coarse) {
-  .nn-editor [data-content-type='checkListItem'] input[type='checkbox'] {
+  .nn-editor [data-content-type='checkListItem'] input[type='checkbox'],
+  .nn-task-check {
     width: 20px;
     height: 20px;
   }
+}
+
+/* Une tâche terminée (spec 6.7) : titre grisé et barré, comme une to-do cochée. */
+.nn-task-title {
+  text-decoration: line-through;
+  text-decoration-color: transparent;
+  transition:
+    color 150ms,
+    text-decoration-color 150ms;
+}
+[data-done='true'] .nn-task-title {
+  color: var(--text-muted);
+  text-decoration-color: currentColor;
 }
 
 .nn-editor [data-content-type='quote'] blockquote {

@@ -183,7 +183,10 @@ class PropertyValue
      */
     private static function isValidDate(mixed $value): bool
     {
-        if (! is_array($value) || array_is_list($value) || ! isset($value['start']) || array_diff(array_keys($value), ['start', 'end']) !== []) {
+        if (! is_array($value) || array_is_list($value) || ! isset($value['start']) || array_diff(array_keys($value), ['start', 'end', 'repeat']) !== []) {
+            return false;
+        }
+        if (! self::isValidRepeat($value['repeat'] ?? null)) {
             return false;
         }
         $start = $value['start'];
@@ -199,6 +202,22 @@ class PropertyValue
         }
 
         return false;
+    }
+
+    /** « Répéter tous les N jours, semaines, mois ou ans » (spec 6.7), ou rien. */
+    private static function isValidRepeat(mixed $repeat): bool
+    {
+        if ($repeat === null) {
+            return true;
+        }
+
+        return is_array($repeat)
+            && ! array_is_list($repeat)
+            && array_diff(array_keys($repeat), ['unit', 'interval']) === []
+            && in_array($repeat['unit'] ?? null, ['day', 'week', 'month', 'year'], true)
+            && is_int($repeat['interval'] ?? null)
+            && $repeat['interval'] >= 1
+            && $repeat['interval'] <= 365;
     }
 
     private static function isDay(string $value): bool

@@ -15,7 +15,7 @@ import {
 } from '@blocknote/react'
 import { BlockNoteView } from '@blocknote/shadcn'
 import type { PageContent } from '@nonotion/shared'
-import { Database, SmilePlus, Table2 } from 'lucide-react'
+import { Database, ListTodo, SmilePlus, Table2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useEffect, useImperativeHandle, useRef } from 'react'
 import { BlockSideMenu, SelectionToolbar } from './BlockMenus'
@@ -71,8 +71,8 @@ function opensSlashMenu(tr: Transaction): boolean {
 
 /** Ce que la page sait faire pour l'éditeur : créer une base (absent dans le bac à sable). */
 export type DatabaseActions = {
-  /** Crée une base en ligne dans la page et renvoie son identifiant. */
-  createInline: () => Promise<string>
+  /** Crée une base en ligne dans la page (ou le Gestionnaire de tâches) ; renvoie son identifiant. */
+  createInline: (template?: 'tasks') => Promise<string>
   /** Crée une base dans une nouvelle sous-page et l'ouvre. */
   createFullPage: () => Promise<void>
 }
@@ -81,6 +81,22 @@ function databaseItems(
   editor: NonotionEditor,
   databases: DatabaseActions,
 ): DefaultReactSuggestionItem[] {
+  const insertInline = (template?: 'tasks') => {
+    // Le bloc apparaît tout de suite ; la base se crée sur le serveur pendant ce temps.
+    const block = insertOrUpdateBlockForSlashMenu(editor, {
+      type: 'database',
+      props: { databaseId: '' },
+    } as NonotionPartialBlock)
+    databases
+      .createInline(template)
+      .then((databaseId) =>
+        editor.updateBlock(block, { props: { databaseId } } as NonotionPartialBlock),
+      )
+      .catch(() => {
+        editor.removeBlocks([block])
+        toast.error('La base de données n’a pas pu être créée.')
+      })
+  }
   return [
     {
       title: 'Base de données',
@@ -88,22 +104,7 @@ function databaseItems(
       aliases: ['database', 'base', 'tableau', 'table', 'bdd', 'données'],
       group: 'Bases de données',
       icon: <Database aria-hidden size={18} />,
-      onItemClick: () => {
-        // Le bloc apparaît tout de suite ; la base se crée sur le serveur pendant ce temps.
-        const block = insertOrUpdateBlockForSlashMenu(editor, {
-          type: 'database',
-          props: { databaseId: '' },
-        } as NonotionPartialBlock)
-        databases
-          .createInline()
-          .then((databaseId) =>
-            editor.updateBlock(block, { props: { databaseId } } as NonotionPartialBlock),
-          )
-          .catch(() => {
-            editor.removeBlocks([block])
-            toast.error('La base de données n’a pas pu être créée.')
-          })
-      },
+      onItemClick: () => insertInline(),
     },
     {
       title: 'Base de données en pleine page',
@@ -116,6 +117,15 @@ function databaseItems(
           .createFullPage()
           .catch(() => toast.error('La base de données n’a pas pu être créée.'))
       },
+    },
+    {
+      title: 'Gestionnaire de tâches',
+      subtext: 'Statut, échéance, priorité ; vues Aujourd’hui et Par statut',
+      // Pas « todo » : « /todo » mène à la case à cocher d'une page (spec 6.3a).
+      aliases: ['tâches', 'taches', 'tasks', 'kanban', 'board', 'projet'],
+      group: 'Bases de données',
+      icon: <ListTodo aria-hidden size={18} />,
+      onItemClick: () => insertInline('tasks'),
     },
   ]
 }

@@ -1,4 +1,10 @@
-import { type Property, TITLE_PROPERTY_ID, type ViewConfig } from '@nonotion/shared'
+import {
+  type DatabaseRow,
+  isEmptyValue,
+  type Property,
+  TITLE_PROPERTY_ID,
+  type ViewConfig,
+} from '@nonotion/shared'
 
 export const DEFAULT_COLUMN_WIDTH = 180
 export const TITLE_COLUMN_WIDTH = 260
@@ -34,4 +40,15 @@ export function moveColumn(ids: readonly string[], moved: string, target: string
   next.splice(from, 1)
   next.splice(to, 0, moved)
   return next
+}
+
+/** Les propriétés visibles d'un élément qui ont une valeur (on n'affiche pas de cases vides). */
+export function filledProperties(row: DatabaseRow, columns: readonly Property[]): Property[] {
+  return columns.filter(
+    (property) =>
+      property.type !== 'title' &&
+      (property.type === 'checkbox'
+        ? row.properties[property.id] === true
+        : !isEmptyValue(row.properties[property.id])),
+  )
 }

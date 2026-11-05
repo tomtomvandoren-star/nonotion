@@ -106,8 +106,23 @@ function isValidInstant(value: string): boolean {
   return INSTANT.test(value) && isValidDay(value.slice(0, 10)) && !Number.isNaN(Date.parse(value))
 }
 
+/** Unités de la récurrence d'une date (« Répéter », spec 6.7). */
+export const REPEAT_UNITS = ['day', 'week', 'month', 'year'] as const
+export type RepeatUnit = (typeof REPEAT_UNITS)[number]
+
+/** « Répéter tous les N jours, semaines, mois ou ans » (1 à 365). */
+export const repeatSchema = z
+  .object({ unit: z.enum(REPEAT_UNITS), interval: z.number().int().min(1).max(365) })
+  .strict()
+
+export type Repeat = z.infer<typeof repeatSchema>
+
 export const dateValueSchema = z
-  .object({ start: z.string(), end: z.string().nullable().optional() })
+  .object({
+    start: z.string(),
+    end: z.string().nullable().optional(),
+    repeat: repeatSchema.nullable().optional(),
+  })
   .strict()
   .refine(({ start }) => isValidDay(start) || isValidInstant(start), { message: 'Date invalide.' })
   .refine(

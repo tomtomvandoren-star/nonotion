@@ -1,4 +1,11 @@
-import type { Property, PropertyType, StatusOption } from './properties'
+import {
+  OPTION_COLORS,
+  type OptionColor,
+  type Property,
+  type PropertyOption,
+  type PropertyType,
+  type StatusOption,
+} from './properties'
 import type { ViewConfig, ViewType } from './views'
 
 /** Libellés français des types de propriétés, dans l'ordre où on les propose. */
@@ -18,6 +25,29 @@ export const VIEW_TYPE_LABELS: Record<ViewType, string> = {
   list: 'Liste',
   calendar: 'Calendrier',
   gallery: 'Galerie',
+}
+
+/** Noms des teintes d'options, pour les menus « Couleur ». */
+export const OPTION_COLOR_LABELS: Record<OptionColor, string> = {
+  default: 'Par défaut',
+  gray: 'Gris',
+  brown: 'Marron',
+  orange: 'Orange',
+  yellow: 'Jaune',
+  green: 'Vert',
+  blue: 'Bleu',
+  purple: 'Violet',
+  pink: 'Rose',
+  red: 'Rouge',
+}
+
+/** La teinte d'une nouvelle option : la première pas encore prise, puis on reprend le cycle. */
+export function nextOptionColor(options: readonly PropertyOption[]): OptionColor {
+  const used = new Set(options.map((option) => option.color))
+  return (
+    OPTION_COLORS.find((color) => color !== 'default' && !used.has(color)) ??
+    OPTION_COLORS[(options.length % (OPTION_COLORS.length - 1)) + 1]!
+  )
 }
 
 const ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789'

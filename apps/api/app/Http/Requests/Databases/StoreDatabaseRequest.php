@@ -14,6 +14,8 @@ class StoreDatabaseRequest extends FormRequest
             'page_id' => ['required', 'string'],
             'full_page' => ['sometimes', 'boolean'],
             'title' => ['sometimes', 'nullable', 'string', 'max:255'],
+            // Un modèle de départ : « tasks », le Gestionnaire de tâches (spec 6.7).
+            'template' => ['sometimes', 'nullable', 'in:tasks'],
         ];
     }
 }

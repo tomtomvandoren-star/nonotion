@@ -332,12 +332,15 @@ export const GROUPABLE_TYPES: readonly PropertyType[] = [
 /**
  * Regroupe des lignes (déjà filtrées et triées) par une propriété : une section par option, dans
  * l'ordre du schéma, plus « Sans … » pour les lignes vides (seulement s'il y en a). Une ligne à
- * plusieurs options apparaît dans chacune. `hide_empty` masque les sections sans ligne.
+ * plusieurs options apparaît dans chacune. `hide_empty` masque les sections sans ligne, `hidden`
+ * celles que l'utilisateur a masquées. Le Board montre toujours « Sans … » (`alwaysShowEmpty`) :
+ * c'est une colonne où l'on dépose des cartes.
  */
 export function groupRows<T extends DatabaseRow>(
   rows: readonly T[],
   schema: readonly Property[],
   groupBy: GroupBy | null | undefined,
+  { alwaysShowEmpty = false }: { alwaysShowEmpty?: boolean } = {},
 ): RowGroup<T>[] | null {
   const property = groupBy ? propertiesById(schema).get(groupBy.property) : undefined
   if (!groupBy || !property || !GROUPABLE_TYPES.includes(property.type)) return null
@@ -370,12 +373,26 @@ export function groupRows<T extends DatabaseRow>(
       if (ids.length === 0) empty.rows.push(row)
       for (const id of ids) byOption.get(id as string)!.rows.push(row)
     }
-    groups = [...(empty.rows.length > 0 ? [empty] : []), ...byOption.values()]
+    groups = [...(empty.rows.length > 0 || alwaysShowEmpty ? [empty] : []), ...byOption.values()]
   } else {
     return null
   }
 
-  return groupBy.hide_empty ? groups.filter((group) => group.rows.length > 0) : groups
+  const hidden = new Set(groupBy.hidden ?? [])
+  return groups.filter(
+    (group) =>
+      !hidden.has(groupKeyId(group.key)) && !(groupBy.hide_empty && group.rows.length === 0),
+  )
+}
+
+/**
+ * L'identifiant d'une section dans `group_by.hidden` : la clé, ou « :empty » pour « Sans … »
+ * (le deux-points n'existe dans aucun identifiant d'option ; un texte vide deviendrait null en route).
+ */
+export const EMPTY_GROUP_ID = ':empty'
+
+export function groupKeyId(key: string | null): string {
+  return key ?? EMPTY_GROUP_ID
 }
 
 /**

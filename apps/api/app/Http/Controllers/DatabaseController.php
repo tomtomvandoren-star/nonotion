@@ -28,7 +28,12 @@ class DatabaseController extends Controller
             throw ValidationException::withMessages(['page_id' => 'La page est introuvable.']);
         }
 
-        [$database, $container] = Databases::create($host, $request->boolean('full_page'), $request->input('title'));
+        [$database, $container] = Databases::create(
+            $host,
+            $request->boolean('full_page'),
+            $request->input('title'),
+            $request->input('template'),
+        );
 
         return response()->json([
             'data' => Databases::detail($database),

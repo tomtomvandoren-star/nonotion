@@ -84,6 +84,8 @@ export const sortRuleSchema = z.object({
 export const groupBySchema = z.object({
   property: propertyIdSchema,
   hide_empty: z.boolean().optional(),
+  /** Sections masquées (une option, « true »/« false », ou « :empty » pour « Sans … »). */
+  hidden: z.array(z.string().max(32)).max(200).optional(),
 })
 
 export const OPEN_PAGES_IN = ['side_peek', 'center_modal', 'full_page'] as const

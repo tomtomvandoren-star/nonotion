@@ -1,4 +1,5 @@
 import {
+  boardGroupable,
   type DatabaseDetail,
   type DatabaseView,
   type FilterGroup,
@@ -155,7 +156,7 @@ export function ViewToolbar({
         </button>
       )}
 
-      <OptionsMenu database={database} config={config} onConfig={onConfig} />
+      <OptionsMenu database={database} view={view} onConfig={onConfig} />
 
       <button
         type="button"
@@ -514,14 +515,19 @@ function AddRuleButton({
 /** « ⋯ Options » : regroupement, ouverture des pages, propriétés visibles. */
 function OptionsMenu({
   database,
-  config,
+  view,
   onConfig,
 }: {
   database: DatabaseDetail
-  config: ViewConfig
+  view: DatabaseView
   onConfig: (config: ViewConfig) => void
 }) {
-  const groupable = database.schema.filter((property) => GROUPABLE_TYPES.includes(property.type))
+  const config = view.config
+  // Un Board a toujours des colonnes : une Sélection, une Sélection multiple ou un Statut.
+  const board = view.type === 'board'
+  const groupable = board
+    ? boardGroupable(database.schema)
+    : database.schema.filter((property) => GROUPABLE_TYPES.includes(property.type))
   const visible = new Set(visibleColumns(database.schema, config).map((property) => property.id))
   const groupBy = config.group_by?.property ?? ''
 
@@ -534,7 +540,9 @@ function OptionsMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-60">
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger>Regrouper par</DropdownMenuSubTrigger>
+          <DropdownMenuSubTrigger>
+            {board ? 'Colonnes par' : 'Regrouper par'}
+          </DropdownMenuSubTrigger>
           <DropdownMenuSubContent>
             <DropdownMenuRadioGroup
               value={groupBy}
@@ -547,7 +555,7 @@ function OptionsMenu({
                 })
               }
             >
-              <DropdownMenuRadioItem value="">Aucun regroupement</DropdownMenuRadioItem>
+              {!board && <DropdownMenuRadioItem value="">Aucun regroupement</DropdownMenuRadioItem>}
               {groupable.map((property) => (
                 <DropdownMenuRadioItem key={property.id} value={property.id}>
                   {property.name}
@@ -556,7 +564,9 @@ function OptionsMenu({
             </DropdownMenuRadioGroup>
             {groupable.length === 0 && (
               <DropdownMenuLabel className="font-normal text-muted-foreground">
-                Ajoutez une Sélection, un Statut ou une Case à cocher.
+                {board
+                  ? 'Ajoutez une Sélection ou un Statut.'
+                  : 'Ajoutez une Sélection, un Statut ou une Case à cocher.'}
               </DropdownMenuLabel>
             )}
           </DropdownMenuSubContent>

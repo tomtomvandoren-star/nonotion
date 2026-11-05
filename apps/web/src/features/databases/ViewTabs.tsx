@@ -5,7 +5,16 @@ import {
   VIEW_TYPE_LABELS,
   type ViewType,
 } from '@nonotion/shared'
-import { Ellipsis, LayoutGrid, List, type LucideIcon, Plus, Table2 } from 'lucide-react'
+import {
+  Calendar,
+  Ellipsis,
+  LayoutGrid,
+  List,
+  type LucideIcon,
+  Plus,
+  SquareKanban,
+  Table2,
+} from 'lucide-react'
 import { useState } from 'react'
 import {
   DropdownMenu,
@@ -17,14 +26,16 @@ import {
 import { cn } from '@/lib/utils'
 import { useViewMutation } from './queries'
 
-const VIEW_ICONS: Partial<Record<ViewType, LucideIcon>> = {
+const VIEW_ICONS: Record<ViewType, LucideIcon> = {
   table: Table2,
+  board: SquareKanban,
   list: List,
+  calendar: Calendar,
   gallery: LayoutGrid,
 }
 
-/** Les types de vues disponibles ; le Board et le Calendrier arrivent avec leurs phases (4 et 5). */
-const AVAILABLE_VIEW_TYPES: ViewType[] = ['table', 'list', 'gallery']
+/** Les types de vues disponibles ; le Calendrier arrive avec sa phase (5). */
+const AVAILABLE_VIEW_TYPES: ViewType[] = ['table', 'board', 'list', 'gallery']
 
 /**
  * Onglets des vues (spec 6.5), au-dessus de la base : cliquer change de vue, double-cliquer renomme,
@@ -61,7 +72,7 @@ export function ViewTabs({
       className="flex min-w-0 items-center gap-0.5 overflow-x-auto"
     >
       {database.views.map((view) => {
-        const Icon = VIEW_ICONS[view.type] ?? Table2
+        const Icon = VIEW_ICONS[view.type]
         const active = view.id === activeId
         if (renaming === view.id)
           return (
@@ -153,7 +164,7 @@ export function ViewTabs({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
           {AVAILABLE_VIEW_TYPES.map((type) => {
-            const Icon = VIEW_ICONS[type]!
+            const Icon = VIEW_ICONS[type]
             return (
               <DropdownMenuItem key={type} onSelect={() => void create(type)}>
                 <Icon aria-hidden /> {VIEW_TYPE_LABELS[type]}

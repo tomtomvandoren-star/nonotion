@@ -10,6 +10,9 @@ export type NewItemProps = {
   onClose: () => void
   /** Les valeurs héritées de la vue (filtre actif, section). */
   values: () => Record<string, unknown>
+  /** La place du nouvel élément ; absente, il va à la fin. */
+  position?: () => string
+  label?: string
   className?: string
 }
 
@@ -24,6 +27,8 @@ export function NewItemInput({
   onOpen,
   onClose,
   values,
+  position,
+  label = 'Nouveau',
   className,
 }: NewItemProps) {
   const createRow = useCreateRow(databaseId)
@@ -32,7 +37,7 @@ export function NewItemInput({
   const submit = () => {
     const text = title
     setTitle('')
-    createRow.mutate({ title: text, properties: values() })
+    createRow.mutate({ title: text, properties: values(), position: position?.() })
   }
 
   if (!open)
@@ -45,7 +50,7 @@ export function NewItemInput({
           className,
         )}
       >
-        <Plus aria-hidden className="size-4" /> Nouveau
+        <Plus aria-hidden className="size-4" /> {label}
       </button>
     )
 
