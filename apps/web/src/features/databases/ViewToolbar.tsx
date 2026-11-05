@@ -18,6 +18,7 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  CalendarPlus,
   ChevronDown,
   Ellipsis,
   ListFilter,
@@ -67,6 +68,7 @@ export function ViewToolbar({
   leading,
   newLabel = 'Nouveau',
   newMenu,
+  onShowFeed,
 }: {
   database: DatabaseDetail
   view: DatabaseView
@@ -81,6 +83,8 @@ export function ViewToolbar({
   newLabel?: string
   /** Les éléments du menu ▾ du bouton (« Importer un agenda… ») ; sans eux, pas de flèche. */
   newMenu?: React.ReactNode
+  /** Afficher la base dans Google Agenda ou le Calendrier Apple. */
+  onShowFeed: () => void
 }) {
   const config = view.config
   const byId = propertiesById(database.schema)
@@ -166,7 +170,7 @@ export function ViewToolbar({
         </button>
       )}
 
-      <OptionsMenu database={database} view={view} onConfig={onConfig} />
+      <OptionsMenu database={database} view={view} onConfig={onConfig} onShowFeed={onShowFeed} />
 
       <div className="ml-1 flex h-7 items-stretch overflow-hidden rounded-sm bg-primary text-sm font-medium text-primary-foreground">
         <button
@@ -187,7 +191,13 @@ export function ViewToolbar({
                 <ChevronDown aria-hidden className="size-4" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64">
+            {/* Le focus ne revient pas sur la flèche à la fermeture : une fenêtre ouverte depuis le
+                menu (import d'agenda) se refermerait aussitôt sur certains appareils. */}
+            <DropdownMenuContent
+              align="end"
+              className="w-64"
+              onCloseAutoFocus={(event) => event.preventDefault()}
+            >
               {newMenu}
             </DropdownMenuContent>
           </DropdownMenu>
@@ -545,10 +555,12 @@ function OptionsMenu({
   database,
   view,
   onConfig,
+  onShowFeed,
 }: {
   database: DatabaseDetail
   view: DatabaseView
   onConfig: (config: ViewConfig) => void
+  onShowFeed: () => void
 }) {
   const config = view.config
   // Un Board a toujours des colonnes : une Sélection, une Sélection multiple ou un Statut.
@@ -627,6 +639,9 @@ function OptionsMenu({
             </DropdownMenuRadioGroup>
           </DropdownMenuSubContent>
         </DropdownMenuSub>
+        <DropdownMenuItem onSelect={() => setTimeout(onShowFeed, 0)}>
+          <CalendarPlus aria-hidden /> Afficher dans Google ou Apple…
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
           Propriétés affichées

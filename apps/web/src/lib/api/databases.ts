@@ -30,6 +30,17 @@ export const createDatabase = (
     input,
   )
 
+/** Le lien d'abonnement (ICS) de la base, pour Google Agenda ou le Calendrier Apple. */
+export const createFeed = (databaseId: string) =>
+  apiRequest(
+    'POST',
+    `databases/${databaseId}/feed`,
+    dataOf(z.object({ feed_url: z.string() })),
+  ).then((r) => r.data)
+
+export const deleteFeed = (databaseId: string) =>
+  apiRequest('DELETE', `databases/${databaseId}/feed`, z.unknown())
+
 export const renameDatabase = (databaseId: string, title: string) =>
   apiRequest('PATCH', `databases/${databaseId}`, z.unknown(), { title })
 

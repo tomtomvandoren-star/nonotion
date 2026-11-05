@@ -40,15 +40,29 @@ export type PagePatch = Partial<{
   is_favorite: boolean
 }>
 
+/**
+ * Les navigateurs gardent en vie au plus 64 Ko de requêtes keepalive à la fois : un document plus
+ * gros part en requête ordinaire.
+ */
+const KEEPALIVE_MAX_CHARS = 48_000
+
+// Keepalive : un titre tapé juste avant de recharger ou de fermer l'onglet arrive quand même.
 export const updatePage = (pageId: string, patch: PagePatch) =>
-  apiRequest('PATCH', `pages/${pageId}`, dataOf(pageTreeItemSchema), patch).then((r) => r.data)
+  apiRequest('PATCH', `pages/${pageId}`, dataOf(pageTreeItemSchema), patch, {
+    keepalive: true,
+  }).then((r) => r.data)
 
 /** Enregistre le document ; lève une ApiError 409 si la page a changé ailleurs (verrouillage optimiste). */
-export const savePageContent = (pageId: string, content: PageContent, version: number) =>
-  apiRequest('PUT', `pages/${pageId}/content`, dataOf(z.object({ version: z.number().int() })), {
-    content,
-    version,
-  }).then((r) => r.data.version)
+export const savePageContent = (pageId: string, content: PageContent, version: number) => {
+  const body = { content, version }
+  return apiRequest(
+    'PUT',
+    `pages/${pageId}/content`,
+    dataOf(z.object({ version: z.number().int() })),
+    body,
+    { keepalive: JSON.stringify(body).length <= KEEPALIVE_MAX_CHARS },
+  ).then((r) => r.data.version)
+}
 
 export const movePage = (pageId: string, parentId: string | null, position: string) =>
   apiRequest('POST', `pages/${pageId}/move`, dataOf(pageTreeItemSchema), {

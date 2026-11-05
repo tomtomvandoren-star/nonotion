@@ -42,13 +42,18 @@ export function ItemPill({
     >
       <button
         type="button"
-        data-calendar-item={item.row.id}
+        {...(item.ghost
+          ? { 'data-calendar-occurrence': item.row.id }
+          : { 'data-calendar-item': item.row.id })}
         data-day-start={item.startDay}
         data-color={color ?? undefined}
-        aria-label={`${displayTitle(item.row.title)}, ${formatDate(item.value as DateValue)}`}
+        aria-label={`${displayTitle(item.row.title)}, ${formatDate(item.value as DateValue)}${item.ghost ? ' (prochaine fois)' : ''}`}
         onClick={onOpen}
         onPointerDown={(event) =>
-          onDragStart?.(event, { kind: 'move', rowId: item.row.id, value: item.value })
+          // Une répétition à venir ne se glisse pas : elle n'existe pas encore.
+          item.ghost
+            ? undefined
+            : onDragStart?.(event, { kind: 'move', rowId: item.row.id, value: item.value })
         }
         className={cn(
           'flex h-[22px] min-w-0 flex-1 items-center gap-1 overflow-hidden px-1.5 text-left text-xs select-none [-webkit-touch-callout:none]',
@@ -59,6 +64,7 @@ export function ItemPill({
             : 'rounded-sm hover:bg-accent',
           bar && continuesBefore && 'rounded-l-none',
           bar && continuesAfter && 'rounded-r-none',
+          item.ghost && 'border border-dashed border-current/40 opacity-60',
         )}
       >
         {!bar && (
@@ -74,7 +80,7 @@ export function ItemPill({
         {time && <span className="shrink-0 text-muted-foreground tabular-nums">{time}</span>}
         <span className="nn-task-title truncate">{displayTitle(item.row.title)}</span>
       </button>
-      {bar && !continuesAfter && onDragStart && (
+      {bar && !continuesAfter && onDragStart && !item.ghost && (
         // Tirer le bord droit change la fin (spec 6.8).
         <span
           aria-hidden

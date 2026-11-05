@@ -3,10 +3,11 @@ import {
   type DatabaseRowData,
   dateValueSchema,
   type DateValue,
+  upcomingOccurrences,
   newProperty,
   type Property,
 } from '@nonotion/shared'
-import { ChevronRight } from 'lucide-react'
+import { CalendarPlus, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import { displayTitle } from '@/features/pages/displayTitle'
 import { requestTitleFocus } from '@/features/pages/useNewPage'
@@ -21,6 +22,7 @@ import {
   calendarProperty,
   type Day,
   type DateProperty,
+  visibleDays,
 } from './dates'
 import { MonthView } from './MonthView'
 import { MyCalendars } from './MyCalendars'
@@ -33,6 +35,8 @@ export type CalendarProps = ViewBodyProps & {
   today: Day
   /** Un élément daté de ce jour, ouvert aussitôt, le curseur dans son titre. */
   onCreate: (day: Day) => void
+  /** Afficher la base dans Google Agenda ou le Calendrier Apple. */
+  onShowFeed: () => void
 }
 
 /** Vue Calendrier (spec 6.8) : le mois ou la semaine, et le panneau « Sans date ». */
@@ -92,6 +96,7 @@ function Calendar({
   anchor,
   today,
   onCreate,
+  onShowFeed,
 }: CalendarProps & { property: DateProperty }) {
   const updateRow = useUpdateRow(database.id)
   const updateConfig = useUpdateViewConfig(database.id)
@@ -116,6 +121,7 @@ function Calendar({
   const colorOf = (item: CalendarItem) =>
     item.row.calendar_source_id ? (colors.get(item.row.calendar_source_id) ?? null) : null
 
+  const lastDay = visibleDays(mode, anchor).at(-1)!
   const dated: CalendarItem[] = []
   const undated: DatabaseRowData[] = []
   for (const row of rows) {
@@ -123,8 +129,15 @@ function Calendar({
     const preview = drag.preview?.rowId === row.id ? drag.preview.value : null
     const parsed = dateValueSchema.safeParse(row.properties[property.id])
     const value: DateValue | null = preview ?? (parsed.success ? parsed.data : null)
-    if (value) dated.push(calendarItem(row, value))
-    else undated.push(row)
+    if (!value) {
+      undated.push(row)
+      continue
+    }
+    dated.push(calendarItem(row, value))
+    // Les prochaines fois d'une tâche qui se répète, à l'avance (spec 6.7).
+    if (value.repeat && !preview)
+      for (const next of upcomingOccurrences(value, lastDay, 60))
+        dated.push(calendarItem(row, next, true))
   }
   const creating =
     drag.preview && drag.preview.rowId === null && drag.preview.value.end
@@ -169,6 +182,14 @@ function Calendar({
           onOpen={open}
           onDragStart={drag.start}
         />
+        <button
+          type="button"
+          onClick={onShowFeed}
+          className="flex h-8 items-center gap-1.5 rounded-sm px-1 text-left text-sm text-muted-foreground hover:bg-accent touch:h-10"
+        >
+          <CalendarPlus aria-hidden className="size-4 shrink-0" />
+          Afficher dans Google ou Apple
+        </button>
       </div>
       <div className="min-w-0 flex-1">
         {mode === 'month' ? (

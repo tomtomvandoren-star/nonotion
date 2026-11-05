@@ -123,7 +123,7 @@ function MonthWeek({
       >
         {shown.map((segment) => (
           <ItemPill
-            key={segment.item.row.id}
+            key={segment.item.key}
             item={segment.item}
             completion={completion}
             continuesBefore={segment.continuesBefore}
@@ -176,7 +176,7 @@ function MoreItems({
         <div className="grid gap-0.5">
           {items.map((item) => (
             <ItemPill
-              key={item.row.id}
+              key={item.key}
               item={item}
               completion={completion}
               color={colorOf(item)}

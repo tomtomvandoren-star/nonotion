@@ -15,7 +15,7 @@ import {
 } from '@blocknote/react'
 import { BlockNoteView } from '@blocknote/shadcn'
 import type { PageContent } from '@nonotion/shared'
-import { Database, ListTodo, SmilePlus, Table2 } from 'lucide-react'
+import { Database, FilePlus, Link2, ListTodo, SmilePlus, Table2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useResolvedTheme } from '@/lib/theme'
 import { useEffect, useImperativeHandle, useRef } from 'react'
@@ -78,6 +78,62 @@ export type DatabaseActions = {
   createFullPage: () => Promise<void>
 }
 
+/** Ce que la page sait faire pour les liens : créer une sous-page, en choisir une, l'ouvrir. */
+export type PageActions = {
+  /** Crée une sous-page de la page ouverte et renvoie son identifiant. */
+  createSubpage: () => Promise<string>
+  /** Laisse choisir une page existante (null : annulé). */
+  pick: () => Promise<{ id: string } | null>
+  /** Ouvre une page, après avoir enregistré celle-ci. */
+  open: (pageId: string) => void
+}
+
+/** « Nouvelle page » et « Lien vers une page » : un bloc lien, vers une page neuve ou existante. */
+function pageItems(editor: NonotionEditor, pages: PageActions): DefaultReactSuggestionItem[] {
+  const insertLink = () =>
+    insertOrUpdateBlockForSlashMenu(editor, {
+      type: 'pageLink',
+      props: { pageId: '' },
+    } as NonotionPartialBlock)
+  return [
+    {
+      title: 'Nouvelle page',
+      subtext: 'Une sous-page, avec son lien ici',
+      aliases: ['page', 'sous-page', 'nouvelle page', 'subpage', 'new page'],
+      group: 'Basique',
+      icon: <FilePlus aria-hidden size={18} />,
+      onItemClick: () => {
+        const block = insertLink()
+        pages
+          .createSubpage()
+          .then((pageId) => {
+            editor.updateBlock(block, { props: { pageId } } as NonotionPartialBlock)
+            pages.open(pageId)
+          })
+          .catch(() => {
+            editor.removeBlocks([block])
+            toast.error('La page n’a pas pu être créée.')
+          })
+      },
+    },
+    {
+      title: 'Lien vers une page',
+      subtext: 'Un lien vers une page qui existe déjà',
+      aliases: ['lien', 'link', 'page', 'relier', 'mention', 'renvoi'],
+      group: 'Basique',
+      icon: <Link2 aria-hidden size={18} />,
+      onItemClick: () => {
+        const block = insertLink()
+        void pages.pick().then((picked) => {
+          if (picked)
+            editor.updateBlock(block, { props: { pageId: picked.id } } as NonotionPartialBlock)
+          else editor.removeBlocks([block])
+        })
+      },
+    },
+  ]
+}
+
 function databaseItems(
   editor: NonotionEditor,
   databases: DatabaseActions,
@@ -134,6 +190,7 @@ function databaseItems(
 function slashMenuItems(
   editor: NonotionEditor,
   databases?: DatabaseActions,
+  pages?: PageActions,
 ): DefaultReactSuggestionItem[] {
   const blocks = BLOCK_CHOICES.map((choice) => ({
     title: choice.title,
@@ -149,6 +206,7 @@ function slashMenuItems(
   // Groupes dans l'ordre de la spec 6.3a : Basique, (Médias,) Bases de données, Avancé.
   return [
     ...blocks.filter((item) => item.group === 'Basique'),
+    ...(pages ? pageItems(editor, pages) : []),
     ...(databases ? databaseItems(editor, databases) : []),
     ...blocks.filter((item) => item.group !== 'Basique'),
     {
@@ -202,6 +260,7 @@ export default function BlockEditor({
   onChange,
   onExitTop,
   databases,
+  pages,
 }: {
   ref?: React.Ref<BlockEditorHandle>
   /** Le document enregistré ; il n'est lu qu'à la création de l'éditeur. */
@@ -210,6 +269,7 @@ export default function BlockEditor({
   /** Flèche haut au tout début du document : on revient au titre. */
   onExitTop: () => void
   databases?: DatabaseActions
+  pages?: PageActions
 }) {
   const exitTop = useRef(onExitTop)
   useEffect(() => {
@@ -282,7 +342,7 @@ export default function BlockEditor({
       <SuggestionMenuController
         triggerCharacter="/"
         shouldOpen={opensSlashMenu}
-        getItems={async (query) => filterChoices(slashMenuItems(editor, databases), query)}
+        getItems={async (query) => filterChoices(slashMenuItems(editor, databases, pages), query)}
       />
       <SideMenuController sideMenu={BlockSideMenu} floatingUIOptions={SIDE_MENU_FLOATING} />
       <FormattingToolbarController formattingToolbar={SelectionToolbar} />

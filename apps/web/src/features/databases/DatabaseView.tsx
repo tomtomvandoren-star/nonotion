@@ -20,6 +20,7 @@ import { useUi } from '@/stores/ui'
 import { BoardView } from './BoardView'
 import { CalendarControls } from './calendar/CalendarControls'
 import { useSyncCalendar } from './calendar/calendarQueries'
+import { CalendarFeedDialog } from './calendar/CalendarFeedDialog'
 import { ImportCalendarDialog } from './calendar/ImportCalendarDialog'
 import { CalendarView } from './calendar/CalendarView'
 import { calendarProperty, type Day, visibleDays } from './calendar/dates'
@@ -147,6 +148,7 @@ function LoadedDatabase({ database, showTitle }: { database: DatabaseDetail; sho
   // La période affichée par un calendrier : elle reste la même quand on bascule Mois | Semaine.
   const [anchor, setAnchor] = useState(() => todayIn(timeZone))
   const [importing, setImporting] = useState(false)
+  const [showingFeed, setShowingFeed] = useState(false)
   const sectionRef = useRef<HTMLElement>(null)
   useSyncOnOpen(database)
 
@@ -264,6 +266,7 @@ function LoadedDatabase({ database, showTitle }: { database: DatabaseDetail; sho
         onSearch={setSearch}
         filterOpen={filterOpen}
         onFilterOpen={setFilterOpen}
+        onShowFeed={() => setShowingFeed(true)}
         {...(view.type === 'calendar'
           ? {
               // « Ajouter » date l'élément d'aujourd'hui s'il est à l'écran, sinon de la période.
@@ -278,7 +281,8 @@ function LoadedDatabase({ database, showTitle }: { database: DatabaseDetail; sho
                   >
                     <Plus aria-hidden /> Nouvel événement
                   </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setImporting(true)}>
+                  {/* Ouverte juste après la fermeture du menu, pas pendant. */}
+                  <DropdownMenuItem onSelect={() => setTimeout(() => setImporting(true), 0)}>
                     <Link2 aria-hidden /> Importer un agenda depuis un lien (ICS)
                   </DropdownMenuItem>
                 </>
@@ -308,11 +312,13 @@ function LoadedDatabase({ database, showTitle }: { database: DatabaseDetail; sho
           anchor={anchor}
           today={ctx.today}
           onCreate={(day) => void createOn(day)}
+          onShowFeed={() => setShowingFeed(true)}
         />
       ) : (
         <TableView {...body} />
       )}
       <ImportCalendarDialog database={database} open={importing} onOpenChange={setImporting} />
+      <CalendarFeedDialog database={database} open={showingFeed} onOpenChange={setShowingFeed} />
       {peek && (
         <RowPeek
           rowId={peek}

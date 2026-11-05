@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CalendarFeedController;
 use App\Http\Controllers\CalendarSourceController;
 use App\Http\Controllers\CronController;
 use App\Http\Controllers\DatabaseController;
@@ -13,6 +14,11 @@ use App\Http\Controllers\ViewController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', HealthController::class)->middleware('throttle:30,1');
+
+// Le flux d'une base pour Google Agenda ou le Calendrier Apple : public, protégé par son jeton secret.
+Route::get('/feeds/{token}.ics', [CalendarFeedController::class, 'show'])
+    ->where('token', '[A-Za-z0-9]{20,64}')
+    ->middleware('throttle:60,1');
 
 // Appelée par le Planificateur de tâches du Manager Infomaniak (webcron).
 Route::match(['get', 'post'], '/cron', CronController::class)->middleware('throttle:10,1');
@@ -59,6 +65,8 @@ Route::middleware(['auth:sanctum', 'throttle:240,1'])->group(function () {
     Route::post('/views/{view}/duplicate', [ViewController::class, 'duplicate']);
     Route::delete('/views/{view}', [ViewController::class, 'destroy']);
 
+    Route::post('/databases/{database}/feed', [CalendarFeedController::class, 'store']);
+    Route::delete('/databases/{database}/feed', [CalendarFeedController::class, 'destroy']);
     Route::patch('/calendar-sources/{source}', [CalendarSourceController::class, 'update']);
     Route::delete('/calendar-sources/{source}', [CalendarSourceController::class, 'destroy']);
 });

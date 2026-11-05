@@ -167,3 +167,71 @@ test.describe('6.8 Vue Calendrier', () => {
     await expect(page.getByRole('button', { name: 'Réunion, 10:00' })).toBeVisible()
   })
 })
+
+test.describe('Répéter, heures et abonnement Google / Apple', () => {
+  test('une tâche qui se répète 3 fois montre ses 2 prochaines fois dans le calendrier', async ({
+    page,
+    request,
+  }) => {
+    await signUpAndOpen(page, request)
+    await createPage(page, 'Maison')
+    await page.getByLabel('Titre de la page').press('Enter')
+    await expect(editorOf(page)).toBeFocused()
+    await page.keyboard.type('/gestionnaire')
+    await page.keyboard.press('Enter')
+    const table = page.getByRole('table', { name: 'Tâches' })
+    const first = table.locator('tbody tr[data-row-id]').first()
+    await first.getByRole('button', { name: 'Nom', exact: true }).click()
+    await page.getByRole('textbox', { name: 'Nom', exact: true }).fill('Arroser')
+    await page.keyboard.press('Enter')
+
+    // Le 1er du mois : ses répétitions restent dans le mois affiché.
+    const firstOfMonth = await page.evaluate(() => {
+      const d = new Date()
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+    })
+    await first.getByRole('button', { name: 'Échéance' }).click()
+    await page.getByLabel('Date de début').fill(firstOfMonth)
+    // L'heure se tape directement : vide, c'est une journée entière.
+    await page.getByLabel('Heure de début').fill('09:30')
+    await page.getByLabel('Répéter').selectOption({ label: 'Toutes les semaines' })
+    await page.getByLabel('Fin de la répétition').selectOption({ label: 'Après…' })
+    await page.getByLabel('Nombre de fois').fill('3')
+    await page.getByRole('button', { name: 'OK' }).click()
+    await expect(first).toContainText('09:30')
+    await expect(
+      first.getByRole('img', { name: 'Toutes les semaines, encore 3 fois' }),
+    ).toBeVisible()
+
+    await page.getByRole('tab', { name: 'Calendrier' }).click()
+    await expect(page.locator('[data-calendar-item]').filter({ hasText: 'Arroser' })).toHaveCount(1)
+    const ghosts = page.locator('[data-calendar-occurrence]').filter({ hasText: 'Arroser' })
+    await expect(ghosts).toHaveCount(2)
+    const day = (offset: number) =>
+      `${firstOfMonth.slice(0, 8)}${String(1 + offset).padStart(2, '0')}`
+    await expect(ghosts.first()).toHaveAttribute('data-day-start', day(7))
+    await expect(ghosts.last()).toHaveAttribute('data-day-start', day(14))
+  })
+
+  test('« Afficher dans Google ou Apple » : un lien d’abonnement qui publie les tâches', async ({
+    page,
+    request,
+  }) => {
+    await signUpAndOpen(page, request)
+    await openCalendar(page)
+    const { todayLabel } = await days(page)
+    await createOn(page, todayLabel, 'Réunion de quartier')
+
+    await page.getByRole('button', { name: 'Afficher dans Google ou Apple' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Afficher dans votre agenda' })
+    await dialog.getByRole('button', { name: 'Créer le lien d’abonnement' }).click()
+    await expect(dialog.getByRole('button', { name: 'Ajouter à Google Agenda' })).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Ajouter au Calendrier Apple' })).toBeVisible()
+
+    // Le flux, tel que Google ou Apple le lisent : sans être connecté.
+    const url = await dialog.getByLabel('Lien d’abonnement').inputValue()
+    const feed = await page.request.get(url)
+    expect(feed.headers()['content-type']).toContain('text/calendar')
+    expect(await feed.text()).toContain('SUMMARY:Réunion de quartier')
+  })
+})

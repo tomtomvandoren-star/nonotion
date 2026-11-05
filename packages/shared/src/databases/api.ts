@@ -74,6 +74,8 @@ export const databaseDetailSchema = z.object({
   views: z.array(databaseViewSchema),
   rows: z.array(databaseRowSchema),
   sources: z.array(calendarSourceSchema).default([]),
+  /** Le lien d'abonnement pour Google Agenda ou le Calendrier Apple, s'il est créé. */
+  feed_url: z.string().nullable().optional(),
 })
 
 export type DatabaseRowData = z.infer<typeof databaseRowSchema>

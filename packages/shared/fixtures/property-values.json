@@ -252,6 +252,92 @@
           "until": "2027-01-01"
         }
       },
+      "valid": true
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05",
+        "repeat": {
+          "unit": "week",
+          "interval": 1,
+          "until": "2026-12-31"
+        }
+      },
+      "valid": true
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05",
+        "repeat": {
+          "unit": "day",
+          "interval": 2,
+          "count": 10
+        }
+      },
+      "valid": true
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05",
+        "repeat": {
+          "unit": "day",
+          "interval": 1,
+          "until": null,
+          "count": null
+        }
+      },
+      "valid": true
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05",
+        "repeat": {
+          "unit": "day",
+          "interval": 1,
+          "count": 0
+        }
+      },
+      "valid": false
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05",
+        "repeat": {
+          "unit": "day",
+          "interval": 1,
+          "count": 2.5
+        }
+      },
+      "valid": false
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05",
+        "repeat": {
+          "unit": "day",
+          "interval": 1,
+          "until": "2026-02-30"
+        }
+      },
+      "valid": false
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05",
+        "repeat": {
+          "unit": "day",
+          "interval": 1,
+          "until": "2026-12-31",
+          "count": 3
+        }
+      },
       "valid": false
     },
     {

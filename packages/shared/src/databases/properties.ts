@@ -110,10 +110,25 @@ function isValidInstant(value: string): boolean {
 export const REPEAT_UNITS = ['day', 'week', 'month', 'year'] as const
 export type RepeatUnit = (typeof REPEAT_UNITS)[number]
 
-/** « Répéter tous les N jours, semaines, mois ou ans » (1 à 365). */
+/**
+ * « Répéter tous les N jours, semaines, mois ou ans » (1 à 365), sans fin, jusqu'à une date
+ * (incluse), ou un certain nombre de fois (`count` : les occurrences restantes, celle-ci comprise).
+ */
 export const repeatSchema = z
-  .object({ unit: z.enum(REPEAT_UNITS), interval: z.number().int().min(1).max(365) })
+  .object({
+    unit: z.enum(REPEAT_UNITS),
+    interval: z.number().int().min(1).max(365),
+    until: z
+      .string()
+      .refine((day) => isValidDay(day), { message: 'Date de fin invalide.' })
+      .nullable()
+      .optional(),
+    count: z.number().int().min(1).max(999).nullable().optional(),
+  })
   .strict()
+  .refine((repeat) => !(repeat.until && repeat.count), {
+    message: 'Une répétition finit à une date ou après un nombre de fois, pas les deux.',
+  })
 
 export type Repeat = z.infer<typeof repeatSchema>
 

@@ -94,8 +94,12 @@ export const minutesOf = (date: Date) => date.getHours() * 60 + date.getMinutes(
 
 /** Un élément tel que le calendrier le place : ses jours (inclus) et, s'il a une heure, ses instants. */
 export type CalendarItem = {
+  /** Unique dans le calendrier : la ligne, et pour une répétition à venir, sa date. */
+  key: string
   row: DatabaseRowData
   value: DateValue
+  /** Une répétition à venir (spec 6.7) : affichée d'avance, elle n'existe pas encore. */
+  ghost: boolean
   allDay: boolean
   startDay: Day
   endDay: Day
@@ -103,18 +107,31 @@ export type CalendarItem = {
   end: Date | null
 }
 
-export function calendarItem(row: DatabaseRowData, value: DateValue): CalendarItem {
+export function calendarItem(row: DatabaseRowData, value: DateValue, ghost = false): CalendarItem {
+  const key = ghost ? `${row.id}@${value.start}` : row.id
   if (!hasTime(value)) {
     const endDay = value.end && value.end > value.start ? value.end : value.start
-    return { row, value, allDay: true, startDay: value.start, endDay, start: null, end: null }
+    return {
+      key,
+      row,
+      value,
+      ghost,
+      allDay: true,
+      startDay: value.start,
+      endDay,
+      start: null,
+      end: null,
+    }
   }
   const start = new Date(value.start)
   const end = value.end ? new Date(value.end) : start
   // Une fin à minuit pile appartient encore à la veille (22 h → minuit tient sur un jour).
   const lastMoment = end > start ? new Date(end.getTime() - 1) : start
   return {
+    key,
     row,
     value,
+    ghost,
     allDay: false,
     startDay: dayOf(start),
     endDay: dayOf(lastMoment),

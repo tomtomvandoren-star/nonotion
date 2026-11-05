@@ -33,20 +33,27 @@ class Recurrence
 
         $value = $after[$date['id']];
         $todo = collect($status['options'])->firstWhere('group', 'todo');
+        $nextValue = self::nextValue($value);
+        unset($value['repeat']);
+        if ($nextValue === null) {
+            // La répétition est finie (date dépassée, dernière fois) : plus de suite.
+            $row->forceFill(['properties' => [...$after, $date['id'] => $value]])->save();
+
+            return null;
+        }
 
         $next = $row->replicate(['version']);
         $next->is_favorite = false;
         $next->position = self::positionAfter($row);
         $next->properties = [
             ...$after,
-            $date['id'] => self::nextValue($value),
+            $date['id'] => $nextValue,
             $status['id'] => $todo['id'] ?? null,
         ];
         $next->save();
         // Une base contenue dans la tâche est copiée, pas partagée entre les deux occurrences.
         PageCopier::copyDatabases([$row->id => $next->id]);
 
-        unset($value['repeat']);
         $row->forceFill(['properties' => [...$after, $date['id'] => $value]])->save();
 
         return $next->refresh();
@@ -54,20 +61,46 @@ class Recurrence
 
     /**
      * La date suivante : le début (et la fin, pour garder la durée) décalés de « tous les N … ».
+     * Null si la répétition est finie : le jour suivant dépasse « jusqu'au », ou c'était la
+     * dernière fois (count compte les occurrences restantes, celle-ci comprise).
      *
-     * @param  array{start: string, end?: string|null, repeat: array{unit: string, interval: int}}  $value
-     * @return array<string, mixed>
+     * @param  array{start: string, end?: string|null, repeat: array{unit: string, interval: int, until?: string|null, count?: int|null}}  $value
+     * @return array<string, mixed>|null
      */
-    public static function nextValue(array $value): array
+    public static function nextValue(array $value): ?array
     {
-        ['unit' => $unit, 'interval' => $interval] = $value['repeat'];
+        $repeat = $value['repeat'];
+        ['unit' => $unit, 'interval' => $interval] = $repeat;
+        $count = $repeat['count'] ?? null;
+        if ($count !== null && $count <= 1) {
+            return null;
+        }
         $zone = $value['time_zone'] ?? null;
         $next = [...$value, 'start' => self::shift($value['start'], $unit, $interval, $zone)];
         if (isset($value['end'])) {
             $next['end'] = self::shift($value['end'], $unit, $interval, $zone);
         }
+        $until = $repeat['until'] ?? null;
+        if ($until !== null && self::localDay($next['start'], $zone) > $until) {
+            return null;
+        }
+        if ($count !== null) {
+            $next['repeat']['count'] = $count - 1;
+        }
 
         return $next;
+    }
+
+    /** Le jour d'un début, dans son fuseau d'origine pour une heure. */
+    private static function localDay(string $start, ?string $zone): string
+    {
+        if (strlen($start) === 10) {
+            return $start;
+        }
+        $date = new DateTimeImmutable($start);
+        $local = self::zone($zone);
+
+        return ($local === null ? $date : $date->setTimezone($local))->format('Y-m-d');
     }
 
     /**

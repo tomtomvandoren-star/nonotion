@@ -113,6 +113,31 @@ it('critère 6.7 : terminer une tâche récurrente crée la suivante, à faire, 
     expect(Page::query()->where('database_id', $tasks['database']['id'])->count())->toBe(4);
 });
 
+it('critère 6.7 : une répétition finit à une date, ou après un nombre de fois', function () {
+    $workspace = signIn();
+    $tasks = createTasks($workspace);
+    $row = $tasks['database']['rows'][0]['id'];
+    $done = fn (string $id) => $this->patchJson("/api/pages/{$id}", ['properties' => [$tasks['status'] => $tasks['done']]]);
+    $todo = fn (string $id) => $this->patchJson("/api/pages/{$id}", ['properties' => [$tasks['status'] => $tasks['todo']]]);
+
+    // Deux fois en tout : la première crée la seconde, qui n'a plus de suite.
+    $this->patchJson("/api/pages/{$row}", ['properties' => [
+        $tasks['due'] => ['start' => '2026-11-05', 'repeat' => ['unit' => 'day', 'interval' => 1, 'count' => 2]],
+    ]])->assertOk();
+    $second = $done($row)->json('created');
+    expect($second['properties'][$tasks['due']])->toBe(['start' => '2026-11-06', 'repeat' => ['unit' => 'day', 'interval' => 1, 'count' => 1]]);
+    $done($second['id'])->assertJsonMissingPath('created');
+
+    // Jusqu'au 12 : le 12 existe encore, le 19 non.
+    $todo($row);
+    $this->patchJson("/api/pages/{$row}", ['properties' => [
+        $tasks['due'] => ['start' => '2026-11-05', 'repeat' => ['unit' => 'week', 'interval' => 1, 'until' => '2026-11-12']],
+    ]])->assertOk();
+    $next = $done($row)->json('created');
+    expect($next['properties'][$tasks['due']]['start'])->toBe('2026-11-12');
+    $done($next['id'])->assertJsonMissingPath('created');
+});
+
 it('une tâche terminée sans répétition ne crée rien', function () {
     $workspace = signIn();
     $tasks = createTasks($workspace);

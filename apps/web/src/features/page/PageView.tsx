@@ -25,12 +25,12 @@ import {
 import { applyRowPatchLocally, databaseKey } from '@/features/databases/queries'
 import { RowProperties } from '@/features/databases/RowProperties'
 // Types seulement : BlockNote ne doit pas entrer dans le premier chargement de l'application.
-import type { BlockEditorHandle, DatabaseActions } from '@/features/editor/BlockEditor'
+import type { BlockEditorHandle, DatabaseActions, PageActions } from '@/features/editor/BlockEditor'
 import type { NonotionBlock } from '@/features/editor/schema'
 import { consumeTitleFocus, requestTitleFocus } from '@/features/pages/useNewPage'
 import { ApiError } from '@/lib/api/client'
 import { createDatabase } from '@/lib/api/databases'
-import { savePageContent } from '@/lib/api/pages'
+import { createPage, savePageContent } from '@/lib/api/pages'
 import { useDebouncedSave } from '@/lib/useDebouncedSave'
 import { cn } from '@/lib/utils'
 import { useUi } from '@/stores/ui'
@@ -397,6 +397,24 @@ function PageBody({
     send(conflict.document, conflict.serverVersion)
   }
 
+  /** « / Nouvelle page » et « / Lien vers une page ». */
+  const pages: PageActions = {
+    createSubpage: async () => {
+      const created = await createPage(workspaceId, { parent_page_id: page.id })
+      queryClient.setQueryData(queryKeys.page(created.id), created)
+      await queryClient.invalidateQueries({ queryKey: queryKeys.tree(workspaceId) })
+      setExpanded(page.id, true)
+      return created.id
+    },
+    pick: () => useUi.getState().pickPage(),
+    open: (pageId) => {
+      // Le lien qu'on vient d'ajouter part avant qu'on quitte la page.
+      save.flush()
+      requestTitleFocus(pageId)
+      void navigate({ to: '/p/$pageId', params: { pageId } })
+    },
+  }
+
   return (
     <>
       <div className="mt-2 min-h-40" onBlur={save.flush}>
@@ -408,6 +426,7 @@ function PageBody({
             onChange={() => save.schedule(undefined)}
             onExitTop={onExitTop}
             databases={databases}
+            pages={pages}
           />
         </Suspense>
       </div>

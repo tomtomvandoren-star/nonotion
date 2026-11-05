@@ -1,6 +1,7 @@
 import { BlockNoteSchema, createHeadingBlockSpec, defaultBlockSpecs } from '@blocknote/core'
 import { createDatabaseBlockSpec } from '@/features/databases/DatabaseBlock'
 import { createCalloutBlockSpec } from './Callout'
+import { createPageLinkBlockSpec } from './PageLink'
 
 /**
  * Les blocs de la phase 2 (spec 9) : texte, titres, listes, to-do, liste dépliable, citation,
@@ -22,6 +23,7 @@ export const schema = BlockNoteSchema.create({
     divider: defaultBlockSpecs.divider,
     callout: createCalloutBlockSpec(),
     database: createDatabaseBlockSpec(),
+    pageLink: createPageLinkBlockSpec(),
   },
 })
 

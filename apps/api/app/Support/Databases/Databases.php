@@ -2,6 +2,7 @@
 
 namespace App\Support\Databases;
 
+use App\Http\Controllers\CalendarFeedController;
 use App\Http\Controllers\CalendarSourceController;
 use App\Models\CalendarSource;
 use App\Models\Database;
@@ -186,6 +187,8 @@ class Databases
             'schema' => $database->schema,
             'views' => $database->views()->get()->map(fn (View $view) => self::view($view))->all(),
             'rows' => $database->rows()->get()->map(fn (Page $row) => self::row($row))->all(),
+            // Le lien d'abonnement pour Google Agenda ou le Calendrier Apple, s'il est créé.
+            'feed_url' => CalendarFeedController::url($database),
             'sources' => CalendarSource::query()->where('database_id', $database->id)->orderBy('created_at')->get()
                 ->map(fn (CalendarSource $source) => CalendarSourceController::present($source))->all(),
         ];

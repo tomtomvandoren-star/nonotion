@@ -211,20 +211,28 @@ class PropertyValue
         return false;
     }
 
-    /** « Répéter tous les N jours, semaines, mois ou ans » (spec 6.7), ou rien. */
+    /**
+     * « Répéter tous les N jours, semaines, mois ou ans » (spec 6.7), ou rien ; sans fin, jusqu'à
+     * une date (until) ou un nombre de fois (count, celle-ci comprise), pas les deux.
+     */
     private static function isValidRepeat(mixed $repeat): bool
     {
         if ($repeat === null) {
             return true;
         }
+        if (! is_array($repeat) || array_is_list($repeat) || array_diff(array_keys($repeat), ['unit', 'interval', 'until', 'count']) !== []) {
+            return false;
+        }
+        $until = $repeat['until'] ?? null;
+        $count = $repeat['count'] ?? null;
 
-        return is_array($repeat)
-            && ! array_is_list($repeat)
-            && array_diff(array_keys($repeat), ['unit', 'interval']) === []
-            && in_array($repeat['unit'] ?? null, ['day', 'week', 'month', 'year'], true)
+        return in_array($repeat['unit'] ?? null, ['day', 'week', 'month', 'year'], true)
             && is_int($repeat['interval'] ?? null)
             && $repeat['interval'] >= 1
-            && $repeat['interval'] <= 365;
+            && $repeat['interval'] <= 365
+            && ($until === null || (is_string($until) && self::isDay($until)))
+            && ($count === null || (is_int($count) && $count >= 1 && $count <= 999))
+            && ! ($until !== null && $count !== null);
     }
 
     private static function isDay(string $value): bool

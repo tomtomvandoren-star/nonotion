@@ -22,23 +22,24 @@ type Item = Pick<SearchResult, 'id' | 'title' | 'icon' | 'context' | 'excerpt'>
 export function SearchPalette() {
   const open = useUi((s) => s.searchOpen)
   const setOpen = useUi((s) => s.setSearchOpen)
+  const picking = useUi((s) => s.searchPick !== null)
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent
         showCloseButton={false}
         className="top-[12vh] max-h-[76dvh] -translate-y-0 grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden p-0 sm:max-w-xl"
       >
-        <DialogTitle className="sr-only">Rechercher</DialogTitle>
+        <DialogTitle className="sr-only">{picking ? 'Lier une page' : 'Rechercher'}</DialogTitle>
         <DialogDescription className="sr-only">
           Tapez un mot du titre ou du texte d’une page ; flèches et Entrée pour l’ouvrir.
         </DialogDescription>
-        {open && <PaletteBody onClose={() => setOpen(false)} />}
+        {open && <PaletteBody picking={picking} onClose={() => setOpen(false)} />}
       </DialogContent>
     </Dialog>
   )
 }
 
-function PaletteBody({ onClose }: { onClose: () => void }) {
+function PaletteBody({ picking, onClose }: { picking: boolean; onClose: () => void }) {
   const navigate = useNavigate()
   const workspaceId = useWorkspaceId() ?? ''
   const tree = useTree()
@@ -84,6 +85,13 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
 
   const choose = (item: Item | undefined) => {
     if (!item) return
+    // Choisir une page à lier : on la renvoie à l'éditeur, sans quitter la page.
+    const pick = useUi.getState().searchPick
+    if (pick) {
+      useUi.setState({ searchOpen: false, searchPick: null })
+      pick({ id: item.id })
+      return
+    }
     onClose()
     void navigate({ to: '/p/$pageId', params: { pageId: item.id } })
   }
@@ -104,12 +112,12 @@ function PaletteBody({ onClose }: { onClose: () => void }) {
         <input
           autoFocus
           role="combobox"
-          aria-label="Rechercher une page"
+          aria-label={picking ? 'Page à lier' : 'Rechercher une page'}
           aria-expanded
           aria-controls="search-results"
           aria-activedescendant={items[active] ? `search-${items[active].id}` : undefined}
           aria-autocomplete="list"
-          placeholder="Rechercher une page…"
+          placeholder={picking ? 'Quelle page lier ?' : 'Rechercher une page…'}
           value={query}
           onChange={(event) => {
             const value = event.target.value

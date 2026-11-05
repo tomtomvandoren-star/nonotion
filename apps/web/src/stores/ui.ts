@@ -21,6 +21,8 @@ interface UiState {
   recentPages: RecentPage[]
   /** La recherche (Ctrl+K) et l'aide des raccourcis (Ctrl+/) : ouvertes ou non, jamais mémorisé. */
   searchOpen: boolean
+  /** La recherche ouverte pour choisir une page à lier : ce qu'on fait du choix (null : annulé). */
+  searchPick: ((page: { id: string } | null) => void) | null
   shortcutsOpen: boolean
   toggleSidebar: () => void
   setSidebarOpen: (open: boolean) => void
@@ -30,6 +32,7 @@ interface UiState {
   setTheme: (theme: Theme) => void
   rememberPage: (page: RecentPage) => void
   setSearchOpen: (open: boolean) => void
+  pickPage: () => Promise<{ id: string } | null>
   setShortcutsOpen: (open: boolean) => void
 }
 
@@ -39,7 +42,7 @@ interface UiState {
  */
 export const useUi = create<UiState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       sidebarOpen: window.matchMedia?.('(min-width: 768px)').matches ?? true,
       sidebarWidth: 240,
       expanded: {},
@@ -47,6 +50,7 @@ export const useUi = create<UiState>()(
       theme: 'system',
       recentPages: [],
       searchOpen: false,
+      searchPick: null,
       shortcutsOpen: false,
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
@@ -69,7 +73,17 @@ export const useUi = create<UiState>()(
             RECENT_MAX,
           ),
         })),
-      setSearchOpen: (open) => set({ searchOpen: open }),
+      setSearchOpen: (open) => {
+        // Fermée sans choisir : le choix d'une page à lier est annulé.
+        const pick = get().searchPick
+        set({ searchOpen: open, searchPick: open ? pick : null })
+        if (!open) pick?.(null)
+      },
+      pickPage: () =>
+        new Promise((resolve) => {
+          get().searchPick?.(null)
+          set({ searchOpen: true, searchPick: resolve })
+        }),
       setShortcutsOpen: (open) => set({ shortcutsOpen: open }),
     }),
     {

@@ -154,7 +154,8 @@ export function DateEditor({
     hasEnd?: boolean
     repeat?: Repeat | null
   }): DateValue | null => {
-    const startDay = next.startDay ?? start.day
+    // Une heure tapée avant la date : c'est pour aujourd'hui.
+    const startDay = next.startDay ?? (start.day || (next.startTime ? localDay(new Date()) : ''))
     if (!startDay) return null
     const time = next.time ?? withTime
     const hasEnd = next.hasEnd ?? withEnd
@@ -204,15 +205,21 @@ export function DateEditor({
             onChange={(event) => onChange(build({ startDay: event.target.value }))}
             className={cn(fieldClass, 'min-w-0 flex-1')}
           />
-          {withTime && (
-            <input
-              type="time"
-              aria-label="Heure de début"
-              value={start.time}
-              onChange={(event) => onChange(build({ startTime: event.target.value }))}
-              className={fieldClass}
-            />
-          )}
+          {/* L'heure est facultative : vide, c'est une journée entière. */}
+          <input
+            type="time"
+            aria-label="Heure de début"
+            title="Heure (facultative)"
+            value={withTime ? start.time : ''}
+            onChange={(event) =>
+              onChange(
+                event.target.value
+                  ? build({ time: true, startTime: event.target.value })
+                  : build({ time: false }),
+              )
+            }
+            className={fieldClass}
+          />
         </div>
       </label>
       {withEnd && (
@@ -249,15 +256,9 @@ export function DateEditor({
         />
         Date de fin
       </label>
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={withTime}
-          disabled={!value}
-          onChange={(event) => onChange(build({ time: event.target.checked }))}
-        />
-        Inclure l’heure
-      </label>
+      {!withTime && (
+        <p className="text-xs text-muted-foreground">Sans heure : une journée entière.</p>
+      )}
       {withTime && value && (
         <p className="text-xs text-muted-foreground">
           Heure de {zoneName(DEVICE_TIME_ZONE)}
@@ -268,6 +269,7 @@ export function DateEditor({
       )}
       <RepeatField
         value={value?.repeat ?? null}
+        startDay={start.day}
         disabled={!value}
         onChange={(repeat) => onChange(build({ repeat }))}
         fieldClass={fieldClass}
@@ -305,11 +307,13 @@ const UNIT_NAMES: Record<RepeatUnit, string> = {
  */
 function RepeatField({
   value,
+  startDay,
   disabled,
   onChange,
   fieldClass,
 }: {
   value: Repeat | null
+  startDay: string
   disabled: boolean
   onChange: (repeat: Repeat | null) => void
   fieldClass: string
@@ -328,9 +332,11 @@ function RepeatField({
           onChange={(event) => {
             const next = event.target.value
             setCustom(next === 'custom')
+            const end = { until: value?.until, count: value?.count }
             if (next === 'none') onChange(null)
-            else if (next === 'custom') onChange({ unit: value?.unit ?? 'week', interval: 2 })
-            else onChange({ unit: next as RepeatUnit, interval: 1 })
+            else if (next === 'custom')
+              onChange({ ...end, unit: value?.unit ?? 'week', interval: 2 })
+            else onChange({ ...end, unit: next as RepeatUnit, interval: 1 })
           }}
           className={cn(fieldClass, 'text-foreground')}
         >
@@ -371,6 +377,85 @@ function RepeatField({
             ))}
           </select>
         </div>
+      )}
+      {value && (
+        <RepeatEnd value={value} startDay={startDay} onChange={onChange} fieldClass={fieldClass} />
+      )}
+    </div>
+  )
+}
+
+/** La fin d'une répétition (spec 6.7) : jamais, jusqu'à une date incluse, ou après N fois. */
+function RepeatEnd({
+  value,
+  startDay,
+  onChange,
+  fieldClass,
+}: {
+  value: Repeat
+  startDay: string
+  onChange: (repeat: Repeat) => void
+  fieldClass: string
+}) {
+  const { until, count, ...rest } = value
+  const kind = until ? 'until' : count ? 'count' : 'never'
+  // Par défaut, un mois après le début.
+  const inAMonth = () => {
+    const [y, m, d] = (startDay || localDay(new Date())).split('-').map(Number) as [
+      number,
+      number,
+      number,
+    ]
+    return localDay(new Date(y, m, d))
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-1 text-sm text-foreground">
+      <label className="flex items-center gap-1">
+        Fin
+        <select
+          aria-label="Fin de la répétition"
+          value={kind}
+          onChange={(event) => {
+            const next = event.target.value
+            if (next === 'until') onChange({ ...rest, until: inAMonth() })
+            else if (next === 'count') onChange({ ...rest, count: 5 })
+            else onChange(rest)
+          }}
+          className={fieldClass}
+        >
+          <option value="never">Jamais</option>
+          <option value="until">Le…</option>
+          <option value="count">Après…</option>
+        </select>
+      </label>
+      {kind === 'until' && (
+        <input
+          type="date"
+          aria-label="Dernier jour de la répétition"
+          min={startDay || undefined}
+          value={until ?? ''}
+          onChange={(event) =>
+            event.target.value && onChange({ ...rest, until: event.target.value })
+          }
+          className={cn(fieldClass, 'min-w-0 flex-1')}
+        />
+      )}
+      {kind === 'count' && (
+        <>
+          <input
+            type="number"
+            aria-label="Nombre de fois"
+            min={1}
+            max={999}
+            value={count ?? 1}
+            onChange={(event) => {
+              const times = Math.round(Number(event.target.value))
+              if (times >= 1 && times <= 999) onChange({ ...rest, count: times })
+            }}
+            className={cn(fieldClass, 'w-16')}
+          />
+          fois
+        </>
       )}
     </div>
   )

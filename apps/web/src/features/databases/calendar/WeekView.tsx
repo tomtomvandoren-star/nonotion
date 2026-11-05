@@ -121,7 +121,7 @@ export function WeekView({
         >
           {band.map((segment) => (
             <ItemPill
-              key={segment.item.row.id}
+              key={segment.item.key}
               item={segment.item}
               completion={completion}
               continuesBefore={segment.continuesBefore}
@@ -224,7 +224,7 @@ function DayColumn({
         const color = colorOf(item)
         return (
           <div
-            key={item.row.id}
+            key={item.key}
             data-done={completion?.isDone(item.row) || undefined}
             className="group/event absolute px-px"
             style={{
@@ -236,14 +236,17 @@ function DayColumn({
           >
             <button
               type="button"
-              data-calendar-item={item.row.id}
+              {...(item.ghost
+                ? { 'data-calendar-occurrence': item.row.id }
+                : { 'data-calendar-item': item.row.id })}
               data-day-start={item.startDay}
               aria-label={`${displayTitle(item.row.title)}, ${timeOf(item.start!)}`}
               data-color={color ?? undefined}
               onClick={() => onOpen(item.row.id)}
               onPointerDown={(event) =>
-                // Un événement importé garde ses heures : elles viennent de l'agenda d'origine.
-                color
+                // Un événement importé garde ses heures (elles viennent de l'agenda d'origine) ;
+                // une répétition à venir n'existe pas encore.
+                color || item.ghost
                   ? undefined
                   : onDragStart(event, {
                       kind: 'move',
@@ -259,6 +262,7 @@ function DayColumn({
                 color
                   ? 'nn-tint border-current hover:brightness-95'
                   : 'border-primary bg-primary/15 hover:bg-primary/25',
+                item.ghost && 'border border-dashed opacity-60',
               )}
             >
               <span className="nn-task-title truncate font-medium">
@@ -270,7 +274,7 @@ function DayColumn({
               </span>
             </button>
             {/* Tirer le bord du bas change la fin (spec 6.8). */}
-            {!color && (
+            {!color && !item.ghost && (
               <span
                 aria-hidden
                 onPointerDown={(event) =>

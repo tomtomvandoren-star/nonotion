@@ -43,8 +43,23 @@ const REPEAT_WORDS: Record<RepeatUnit, [every: string, unit: string]> = {
   year: ['Tous les', 'ans'],
 }
 
-/** « Tous les jours », « Toutes les 2 semaines », « Tous les 3 mois »… */
+const untilFormat = new Intl.DateTimeFormat('fr-FR', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'UTC',
+})
+
+/**
+ * « Tous les jours », « Toutes les 2 semaines », « Tous les 3 mois »… et sa fin : « jusqu'au
+ * 31 déc. 2026 », « encore 4 fois ».
+ */
 export function repeatLabel(repeat: Repeat): string {
   const [every, unit] = REPEAT_WORDS[repeat.unit]
-  return repeat.interval === 1 ? `${every} ${unit}` : `${every} ${repeat.interval} ${unit}`
+  const base = repeat.interval === 1 ? `${every} ${unit}` : `${every} ${repeat.interval} ${unit}`
+  if (repeat.until)
+    return `${base}, jusqu’au ${untilFormat.format(new Date(`${repeat.until}T00:00:00Z`))}`
+  if (repeat.count)
+    return repeat.count === 1 ? `${base}, dernière fois` : `${base}, encore ${repeat.count} fois`
+  return base
 }

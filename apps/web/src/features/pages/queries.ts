@@ -49,7 +49,11 @@ export function useTree() {
 }
 
 export function usePage(pageId: string) {
-  return useQuery({ queryKey: queryKeys.page(pageId), queryFn: () => fetchPage(pageId) })
+  return useQuery({
+    queryKey: queryKeys.page(pageId),
+    queryFn: () => fetchPage(pageId),
+    enabled: pageId !== '',
+  })
 }
 
 export function useTrash(enabled: boolean) {

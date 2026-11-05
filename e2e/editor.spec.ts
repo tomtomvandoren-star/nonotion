@@ -284,6 +284,33 @@ test.describe('Sauvegarde automatique', () => {
     await page.waitForTimeout(1500)
     expect(writes).toEqual([])
   })
+
+  test('recharger ou revenir en arrière aussitôt après avoir tapé ne perd rien', async ({
+    page,
+    request,
+  }) => {
+    await openEmptyPage(page, request)
+    // Sans attendre l'envoi groupé (500 ms) : la page se ferme alors que la frappe attend encore.
+    await page.keyboard.type('Tapé juste avant')
+    await page.reload()
+    await expect.poll(() => editorBlocks(page)).toEqual([['paragraph', 'Tapé juste avant']])
+
+    await page.getByLabel('Titre de la page').fill('Titre tapé juste avant')
+    await page.reload()
+    await expect(page.getByLabel('Titre de la page')).toHaveValue('Titre tapé juste avant')
+
+    // Retour arrière sans quitter l'éditeur : il est démonté encore actif, le dernier mot part.
+    await createPage(page, 'Deuxième')
+    await page.goBack()
+    await editorOf(page).getByText('Tapé juste avant').click()
+    await page.keyboard.press('End')
+    await page.keyboard.type(' et encore')
+    await page.goBack()
+    await page.goForward()
+    await expect
+      .poll(() => editorBlocks(page))
+      .toEqual([['paragraph', 'Tapé juste avant et encore']])
+  })
 })
 
 test.describe('Conflit entre deux appareils', () => {

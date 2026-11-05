@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { create } from 'zustand'
 
 /** Nombre de sauvegardes en attente (frappe en cours), pour l'indicateur « Enregistrement… ». */
@@ -45,8 +45,24 @@ export function useDebouncedSave<T>(save: (value: T) => void, delay = SAVE_DELAY
 
   const hasPending = useCallback(() => pending.current !== null, [])
 
-  // Quitter la page n'abandonne jamais une modification.
-  useEffect(() => flush, [flush])
+  // Recharger, fermer l'onglet ou passer en arrière-plan (téléphone) : ce qui attend part tout de
+  // suite, en keepalive pour survivre à la fermeture (voir lib/api/pages.ts).
+  useEffect(() => {
+    const onHidden = () => {
+      if (document.visibilityState === 'hidden') flush()
+    }
+    window.addEventListener('pagehide', flush)
+    document.addEventListener('visibilitychange', onHidden)
+    return () => {
+      window.removeEventListener('pagehide', flush)
+      document.removeEventListener('visibilitychange', onHidden)
+    }
+  }, [flush])
+
+  // Quitter la page n'abandonne jamais une modification. Effet de mise en page : son nettoyage passe
+  // avant celui des composants enfants, quand l'éditeur est encore là pour donner son document (un
+  // useEffect le trouverait déjà détaché, et la dernière frappe serait perdue).
+  useLayoutEffect(() => flush, [flush])
 
   return useMemo(() => ({ schedule, flush, hasPending }), [schedule, flush, hasPending])
 }
