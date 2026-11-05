@@ -214,6 +214,8 @@ test.describe('6.10 Vue Tableau', () => {
     await page.getByLabel('Nom de la propriété').fill('Montant')
     await page.keyboard.press('Enter')
     await expect(page.getByRole('button', { name: 'Colonne Montant' })).toBeVisible()
+    // Le menu de la colonne est fermé avant d'ouvrir celui de la suivante.
+    await expect(page.getByRole('menu')).toHaveCount(0)
 
     await page.getByRole('button', { name: 'Colonne Nom' }).click()
     await page.getByRole('menuitem', { name: 'Trier par ordre croissant' }).click()
@@ -229,11 +231,36 @@ test.describe('6.10 Vue Tableau', () => {
     await page.getByRole('menuitem', { name: 'Masquer' }).click()
     await expect(page.getByRole('button', { name: 'Colonne Montant' })).toHaveCount(0)
 
+    // Ajoutée aussitôt après avoir masqué une colonne (pas encore enregistré) : elle apparaît.
     await addProperty(page, 'Jetable', 'Texte')
     await page.getByRole('button', { name: 'Colonne Jetable' }).click()
     await page.getByRole('menuitem', { name: 'Supprimer la propriété' }).click()
     await page.getByRole('button', { name: 'Supprimer', exact: true }).click()
     await expect(page.getByRole('button', { name: 'Colonne Jetable' })).toHaveCount(0)
+  })
+
+  test('une propriété ajoutée avant que la vue soit enregistrée apparaît quand même', async ({
+    page,
+    request,
+  }) => {
+    await openDatabase(page, request)
+    await addProperty(page, 'Prix', 'Texte')
+    // Le serveur reçoit la vue en retard : il ne sait pas encore que « Prix » est masquée.
+    await page.route('**/api/views/*', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      await route.continue()
+    })
+    await page.getByRole('button', { name: 'Colonne Prix' }).click()
+    await page.getByRole('menuitem', { name: 'Masquer' }).click()
+    await addProperty(page, 'Lieu', 'Texte')
+    await expect(page.getByRole('button', { name: 'Colonne Prix' })).toHaveCount(0)
+
+    // La vue retardée finit par partir, avec « Lieu » dans ses colonnes.
+    await page.waitForTimeout(2500)
+    await page.unrouteAll({ behavior: 'wait' })
+    await page.reload()
+    await expect(page.getByRole('button', { name: 'Colonne Lieu' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Colonne Prix' })).toHaveCount(0)
   })
 
   test('colonnes réordonnées et redimensionnées par glisser, retrouvées après rechargement', async ({

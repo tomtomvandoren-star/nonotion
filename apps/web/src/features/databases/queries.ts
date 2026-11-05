@@ -29,38 +29,69 @@ import { formatDate } from './values'
 
 export const databaseKey = (databaseId: string) => ['database', databaseId] as const
 
-/** Configurations de vues modifiées ici et pas encore envoyées (voir useUpdateViewConfig). */
+/**
+ * Configurations de vues modifiées ici et pas encore enregistrées (voir useUpdateViewConfig) : en
+ * attente des 400 ms, ou envoyées sans réponse encore. Tant qu'elles sont là, c'est notre version
+ * qui s'affiche, pas celle d'une réponse du serveur arrivée entre-temps.
+ */
 type PendingConfig = {
-  timer: ReturnType<typeof setTimeout>
+  timer?: ReturnType<typeof setTimeout>
   config: ViewConfig
-  send: (config: ViewConfig) => void
+  send: (config: ViewConfig) => Promise<unknown>
+  inFlight: boolean
+  /** Modifiée pendant l'envoi : à renvoyer dès la réponse. */
+  dirty: boolean
 }
 const pendingConfigs = new Map<string, PendingConfig>()
 
+/** Envoie la configuration d'une vue ; une seule requête à la fois par vue, la dernière gagne. */
+function sendConfig(viewId: string, pending: PendingConfig) {
+  clearTimeout(pending.timer)
+  pending.timer = undefined
+  if (pending.inFlight) {
+    pending.dirty = true
+    return
+  }
+  pending.inFlight = true
+  void pending
+    .send(pending.config)
+    .catch(() => undefined)
+    .finally(() => {
+      pending.inFlight = false
+      if (pending.dirty) {
+        pending.dirty = false
+        sendConfig(viewId, pending)
+      } else if (!pending.timer && pendingConfigs.get(viewId) === pending) {
+        pendingConfigs.delete(viewId)
+      }
+    })
+}
+
 /** Quitter, recharger ou masquer la page envoie tout de suite ce qui attendait encore. */
 function flushPendingConfigs() {
-  for (const [viewId, pending] of pendingConfigs) {
-    clearTimeout(pending.timer)
-    pendingConfigs.delete(viewId)
-    pending.send(pending.config)
-  }
+  for (const [viewId, pending] of pendingConfigs) if (pending.timer) sendConfig(viewId, pending)
 }
 
 /**
- * Notre configuration pas encore envoyée, plus les colonnes que le serveur vient d'y ajouter
- * (une propriété créée entre-temps) : sinon la nouvelle colonne n'apparaîtrait pas.
+ * Notre configuration pas encore envoyée, ajustée au schéma que le serveur vient de renvoyer : une
+ * propriété créée entre-temps rejoint ses colonnes (le serveur, qui n'a pas encore reçu notre
+ * liste, ne pouvait pas l'y ajouter), une propriété supprimée en sort.
  */
 function mergePendingConfig(
   pending: PendingConfig,
-  server: DatabaseView,
+  schemaIds: readonly string[],
   knownIds: ReadonlySet<string>,
 ): ViewConfig {
   const ours = pending.config.visible_properties
-  const added = (server.config.visible_properties ?? []).filter(
-    (id) => !knownIds.has(id) && !ours?.includes(id),
-  )
-  if (ours && added.length > 0)
-    pending.config = { ...pending.config, visible_properties: [...ours, ...added] }
+  if (ours) {
+    const added = schemaIds.filter((id) => !knownIds.has(id) && !ours.includes(id))
+    const kept = ours.filter((id) => schemaIds.includes(id))
+    if (added.length > 0 || kept.length !== ours.length) {
+      pending.config = { ...pending.config, visible_properties: [...kept, ...added] }
+      // Déjà partie sans la nouvelle colonne : elle repart à la réponse.
+      if (pending.inFlight) pending.dirty = true
+    }
+  }
   return pending.config
 }
 
@@ -325,12 +356,13 @@ export function usePropertyMutation(databaseId: string) {
     onSuccess: (database, _change, context) => {
       const current = queryClient.getQueryData<DatabaseDetail>(databaseKey(databaseId))
       const known = new Set(current?.schema.map((property) => property.id))
+      const schemaIds = database.schema.map((property) => property.id)
       queryClient.setQueryData<DatabaseDetail>(databaseKey(databaseId), {
         ...database,
         rows: context?.keepRows && current ? current.rows : database.rows,
         views: database.views.map((view) => {
           const pending = pendingConfigs.get(view.id)
-          return pending ? { ...view, config: mergePendingConfig(pending, view, known) } : view
+          return pending ? { ...view, config: mergePendingConfig(pending, schemaIds, known) } : view
         }),
       })
     },
@@ -385,15 +417,17 @@ export function useUpdateViewConfig(databaseId: string) {
 
   return (view: DatabaseView, config: ViewConfig) => {
     replaceView(queryClient, databaseId, { ...view, config })
-    clearTimeout(pendingConfigs.get(view.id)?.timer)
-    const pending: PendingConfig = {
+    const send = (latest: ViewConfig) => save.mutateAsync({ viewId: view.id, config: latest })
+    const pending: PendingConfig = pendingConfigs.get(view.id) ?? {
       config,
-      send: (latest) => save.mutate({ viewId: view.id, config: latest }),
-      timer: setTimeout(() => {
-        pendingConfigs.delete(view.id)
-        pending.send(pending.config)
-      }, 400),
+      send,
+      inFlight: false,
+      dirty: false,
     }
+    pending.config = config
+    pending.send = send
+    clearTimeout(pending.timer)
+    pending.timer = setTimeout(() => sendConfig(view.id, pending), 400)
     pendingConfigs.set(view.id, pending)
   }
 }
