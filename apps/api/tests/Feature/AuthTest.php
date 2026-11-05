@@ -105,6 +105,8 @@ it('envoie un lien de réinitialisation vers le front, sans révéler si le comp
 it('répond 503 avec un message clair si l’envoi d’e-mails ne marche pas', function () {
     $user = createAccount('Gaby');
     Password::shouldReceive('sendResetLink')->andThrow(new TransportException('SMTP injoignable'));
+    // Le jeton créé pour un envoi raté est retiré (sinon le réessai répondrait « envoyé »).
+    Password::shouldReceive('broker->deleteToken')->once();
 
     $this->postJson('/api/auth/forgot-password', ['email' => $user->email])
         ->assertStatus(503)
@@ -139,4 +141,15 @@ it('refuse un lien de réinitialisation invalide', function () {
         'password' => 'nouveau-mot-de-passe',
         'password_confirmation' => 'nouveau-mot-de-passe',
     ])->assertUnprocessable()->assertJsonPath('errors.email.0', 'Ce lien de réinitialisation est invalide ou a expiré.');
+});
+
+it('répond 503 si l’adresse d’expédition est mal réglée, et encore au nouvel essai (pas de faux succès)', function () {
+    // Constaté en production : MAIL_FROM_ADDRESS valait un nom de domaine, sans « @ ».
+    config(['mail.from.address' => 'example.test']);
+    $user = createAccount('Hugo');
+
+    $this->postJson('/api/auth/forgot-password', ['email' => $user->email])->assertStatus(503);
+    $this->postJson('/api/auth/forgot-password', ['email' => $user->email])
+        ->assertStatus(503)
+        ->assertJsonPath('message', 'L’envoi d’e-mails est indisponible pour le moment. Réessayez plus tard.');
 });

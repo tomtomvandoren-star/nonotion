@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\PersonalAccessToken;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
+use Symfony\Component\Mime\Exception\ExceptionInterface as MimeExceptionInterface;
 
 /**
  * Comptes par jetons Bearer (Sanctum) : un seul mécanisme pour le web, le desktop et le mobile.
@@ -87,8 +88,15 @@ class AuthController extends Controller
         try {
             // Même réponse que le compte existe ou non : on ne révèle pas quelles adresses sont inscrites.
             Password::sendResetLink(['email' => $request->input('email')]);
-        } catch (TransportExceptionInterface $e) {
-            Log::error('Envoi de l’e-mail de réinitialisation impossible', ['exception' => $e::class]);
+        } catch (TransportExceptionInterface|MimeExceptionInterface $e) {
+            // Serveur SMTP injoignable, ou adresse d'expédition mal réglée (MAIL_FROM_ADDRESS) : le lien
+            // n'est pas parti. On retire le jeton créé, sinon la limite d'un envoi par minute ferait
+            // répondre au prochain essai qu'un e-mail vient d'être envoyé.
+            $user = User::query()->where('email', $request->input('email'))->first();
+            if ($user !== null) {
+                Password::broker()->deleteToken($user);
+            }
+            Log::error('Envoi de l’e-mail de réinitialisation impossible', ['exception' => $e::class, 'message' => $e->getMessage()]);
 
             return response()->json(['message' => __('auth.mail_unavailable')], 503);
         }

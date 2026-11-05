@@ -136,12 +136,20 @@ class HostingCheck extends Command
 
         $this->report('Mot de passe de /api/cron', config('nonotion.cron.password') ? 'défini' : 'absent (URL désactivée)');
 
-        // Pas un échec : sans SMTP, seule la réinitialisation du mot de passe par e-mail est indisponible.
+        // Pas un échec s'il manque : sans SMTP, seule la réinitialisation du mot de passe par e-mail est
+        // indisponible. Mais une adresse d'expédition qui n'en est pas une fait échouer chaque envoi.
         $mailer = (string) config('mail.default');
         $smtpReady = $mailer !== 'smtp' || (config('mail.mailers.smtp.username') && config('mail.from.address'));
         $this->report('E-mails (réinitialisation du mot de passe)', $smtpReady
             ? "envoi par {$mailer}"
             : 'SMTP incomplet : remplir MAIL_USERNAME, MAIL_PASSWORD et MAIL_FROM_ADDRESS');
+        $from = config('mail.from.address');
+        if ($mailer === 'smtp' && $from) {
+            $valid = filter_var($from, FILTER_VALIDATE_EMAIL) !== false;
+            $this->report('Adresse d’expédition (MAIL_FROM_ADDRESS)', $valid
+                ? (string) $from
+                : "« {$from} » n’est pas une adresse complète : mettre celle de la boîte, par exemple ".config('mail.mailers.smtp.username'), $valid);
+        }
     }
 
     private function checkOutboundHttps(): void
