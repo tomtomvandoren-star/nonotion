@@ -1,8 +1,8 @@
 name: Builds natifs de test
 
 # Test précoce de la fin de la phase 2 (spec 9) : le bac à sable de l'éditeur emballé pour
-# Android (Capacitor) et pour Linux (Tauri, vue web WebKitGTK). Lancé à la main, ou quand
-# l'éditeur ou les emballages changent.
+# Android (Capacitor). Lancé à la main, ou quand l'éditeur ou l'emballage changent. Les
+# applications pour ordinateur ont leur propre workflow depuis la phase 8 (desktop.yml).
 on:
   workflow_dispatch:
   push:
@@ -13,7 +13,7 @@ on:
       - apps/web/src/index.css
       - apps/web/sandbox.html
       - apps/mobile/**
-      - apps/desktop/**
+      - apps/desktop/app-icon.svg
       - .github/workflows/native.yml
 
 concurrency:
@@ -62,62 +62,4 @@ jobs:
         with:
           name: nonotion-editeur-android
           path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 30
-
-  linux:
-    name: Linux (Tauri, WebKitGTK)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 40
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Prérequis Tauri (WebKitGTK) et écran virtuel
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev \
-            libayatana-appindicator3-dev librsvg2-dev xvfb
-
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: apps/desktop/src-tauri
-
-      - name: Dépendances
-        run: pnpm install --frozen-lockfile
-
-      - name: Bac à sable de l'éditeur
-        run: pnpm --filter @nonotion/web build:sandbox
-
-      - name: AppImage et paquet .deb
-        working-directory: apps/desktop
-        run: |
-          pnpm icons
-          pnpm build:linux
-
-      # Test de démarrage seulement : dans l'écran virtuel de la CI, la fenêtre de l'application
-      # n'apparaît pas (seule la fenêtre cachée de GTK existe, sans message d'erreur), donc aucune
-      # capture n'est possible ici. L'essai visuel se fera sur une vraie machine Linux (phase 8).
-      - name: L'application démarre et ne plante pas
-        working-directory: apps/desktop
-        run: |
-          xvfb-run -a bash -c '
-            ./src-tauri/target/release/nonotion > application.log 2>&1 &
-            app=$!
-            sleep 15
-            if ! kill -0 "$app"; then echo "L’application s’est arrêtée au lancement"; cat application.log; exit 1; fi
-            kill "$app"
-            cat application.log
-          '
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: nonotion-editeur-linux
-          path: |
-            apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage
-            apps/desktop/src-tauri/target/release/bundle/deb/*.deb
           retention-days: 30

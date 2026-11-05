@@ -42,6 +42,22 @@ export function apiUrl(path: string, base: string = API_URL): string {
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
+/** Écritures parties et pas encore revenues du serveur. */
+let writesInFlight = 0
+const writesIdle: Array<() => void> = []
+
+/**
+ * Attend que les écritures en cours aient atteint le serveur (au plus `timeoutMs`) : avant que
+ * l'application ne redémarre pour une mise à jour, par exemple.
+ */
+export function writesSettled(timeoutMs = 10_000): Promise<void> {
+  if (writesInFlight === 0) return Promise.resolve()
+  return new Promise((resolve) => {
+    writesIdle.push(resolve)
+    setTimeout(resolve, timeoutMs)
+  })
+}
+
 /**
  * Requête JSON ; la réponse est validée par un schéma Zod, pour ne jamais accepter de données inattendues.
  * `keepalive` : la requête part même si la page se ferme ou se recharge entre-temps.
@@ -58,12 +74,16 @@ export async function apiRequest<T>(
   if (body !== undefined) headers['Content-Type'] = 'application/json'
   if (token) headers.Authorization = `Bearer ${token}`
 
+  const write = method !== 'GET'
+  if (write) writesInFlight++
   const response = await fetch(apiUrl(path), {
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
     keepalive,
     signal,
+  }).finally(() => {
+    if (write && --writesInFlight === 0) for (const resolve of writesIdle.splice(0)) resolve()
   })
 
   const data: unknown = response.status === 204 ? null : await response.json().catch(() => null)

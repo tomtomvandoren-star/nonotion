@@ -95,14 +95,14 @@ function mergePendingConfig(
   return pending.config
 }
 
-// Quitter, recharger ou passer en arrière-plan : tout ce qui attend encore part tout de suite.
-const flushAll = () => {
+/** Quitter, recharger, passer en arrière-plan ou redémarrer : tout ce qui attend part tout de suite. */
+export function flushPendingSaves() {
   flushPendingConfigs()
   flushRowQueues()
 }
-window.addEventListener('pagehide', flushAll)
+window.addEventListener('pagehide', flushPendingSaves)
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') flushAll()
+  if (document.visibilityState === 'hidden') flushPendingSaves()
 })
 
 /** Même rythme que l'arbre : rafraîchissement à la place du temps réel (spec 1.3.6). */

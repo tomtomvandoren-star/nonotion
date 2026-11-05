@@ -1,0 +1,199 @@
+name: Applications pour ordinateur
+
+# Phase 8 : Nonotion pour Windows, macOS et Linux (Tauri 2). Chaque système construit ses
+# installateurs, les installe comme le ferait un utilisateur, puis lance l'application installée
+# (essai de démarrage : l'écran de connexion doit s'afficher).
+#
+# Publier une version : changer « version » dans apps/desktop/src-tauri/tauri.conf.json, pousser,
+# puis lancer ce workflow à la main avec « publier ». Il crée la version vX.Y.Z sur GitHub avec les
+# installateurs et latest.json, le manifeste lu par la mise à jour automatique.
+on:
+  workflow_dispatch:
+    inputs:
+      publier:
+        description: Publier la version de tauri.conf.json sur GitHub (installateurs et mise à jour)
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+    paths:
+      - apps/desktop/**
+      - apps/web/src/platform/**
+      - apps/web/.env.desktop
+      - apps/web/package.json
+      - apps/api/config/cors.php
+      - .github/workflows/desktop.yml
+
+concurrency:
+  group: desktop-${{ github.ref }}-${{ inputs.publier == true }}
+  cancel-in-progress: ${{ inputs.publier != true }}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows (.exe, .msi)
+            os: windows-latest
+            args: --bundles nsis,msi
+            bundle: target/release/bundle
+          - name: macOS (.dmg, Intel et Apple Silicon)
+            os: macos-latest
+            args: --target universal-apple-darwin --bundles app,dmg
+            rust_targets: aarch64-apple-darwin,x86_64-apple-darwin
+            bundle: target/universal-apple-darwin/release/bundle
+          # La plus ancienne Ubuntu prise en charge : l'AppImage marche aussi sur les systèmes récents.
+          - name: Linux (AppImage, .deb)
+            os: ubuntu-22.04
+            args: --bundles appimage,deb
+            bundle: target/release/bundle
+    env:
+      # Même adresse que apps/web/.env.desktop ; l'essai de démarrage la lit aussi (smoke.rs).
+      VITE_API_URL: https://nonotion.thomasvandoren.be/api
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      TAURI_UPDATER_PUBKEY: ${{ vars.TAURI_UPDATER_PUBKEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Prérequis Tauri (WebKitGTK) et écran virtuel
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev \
+            libayatana-appindicator3-dev librsvg2-dev xvfb
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_targets }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+
+      - name: Dépendances
+        run: pnpm install --frozen-lockfile
+
+      - name: Icônes
+        working-directory: apps/desktop
+        run: pnpm icons
+
+      # Sans clé, les installateurs se construisent quand même, mais l'application installée ne
+      # saura jamais se mettre à jour : on ne publie donc pas de version sans elle.
+      - name: Mises à jour signées
+        id: updater
+        shell: bash
+        working-directory: apps/desktop
+        run: |
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ] || [ -z "$TAURI_UPDATER_PUBKEY" ]; then
+            if [ "${{ inputs.publier }}" = "true" ]; then
+              echo "::error::Clé de signature des mises à jour absente (secret TAURI_SIGNING_PRIVATE_KEY, variable TAURI_UPDATER_PUBKEY) : rien n'est publié."
+              exit 1
+            fi
+            echo "::notice::Clé de signature des mises à jour absente : installateurs sans mise à jour automatique."
+            exit 0
+          fi
+          cat > src-tauri/tauri.updater.conf.json <<EOF
+          {
+            "bundle": { "createUpdaterArtifacts": true },
+            "plugins": {
+              "updater": {
+                "pubkey": "$TAURI_UPDATER_PUBKEY",
+                "endpoints": ["https://github.com/${{ github.repository }}/releases/latest/download/latest.json"],
+                "windows": { "installMode": "passive" }
+              }
+            }
+          }
+          EOF
+          echo "args=--config src-tauri/tauri.updater.conf.json" >> "$GITHUB_OUTPUT"
+
+      - name: Installateurs
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: apps/desktop
+          tauriScript: pnpm tauri
+          args: ${{ matrix.args }} ${{ steps.updater.outputs.args }}
+          # Sans « publier », rien ne part sur GitHub : construction seule.
+          tagName: ${{ inputs.publier == true && 'v__VERSION__' || '' }}
+          releaseName: Nonotion __VERSION__
+          releaseBody: |
+            Installer Nonotion sur son ordinateur :
+            - **Windows** : `Nonotion_…_x64-setup.exe` (ou le `.msi`).
+            - **macOS** (Intel et Apple Silicon) : `Nonotion_…_universal.dmg`. Au premier lancement, clic droit sur l'application puis « Ouvrir » (application non notariée).
+            - **Linux** : `.AppImage` (rendre exécutable, puis lancer) ou `.deb` (Debian, Ubuntu).
+
+            Les versions installées se mettent ensuite à jour d'elles-mêmes.
+          releaseDraft: false
+          prerelease: false
+
+      # L'utilisateur installe, puis ouvre l'application : l'écran de connexion doit apparaître.
+      - name: Installation et démarrage (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        working-directory: apps/desktop/src-tauri
+        run: |
+          $installer = Get-ChildItem "${{ matrix.bundle }}/nsis/*-setup.exe" | Select-Object -First 1
+          Start-Process $installer.FullName -ArgumentList '/S' -Wait
+          $exe = Get-ChildItem "$env:LOCALAPPDATA\Nonotion" -Recurse -Filter *.exe |
+            Where-Object { $_.Name -notmatch 'uninstall' } | Select-Object -First 1
+          Write-Output "Installé : $($exe.FullName)"
+          $env:NONOTION_SMOKE_TEST = '1'
+          $app = Start-Process $exe.FullName -PassThru -Wait `
+            -RedirectStandardOutput essai.txt -RedirectStandardError erreurs.txt
+          Get-Content essai.txt, erreurs.txt
+          if ($app.ExitCode -ne 0) { throw "Essai de démarrage : code $($app.ExitCode)" }
+
+      - name: Installation et démarrage (macOS)
+        if: runner.os == 'macOS'
+        working-directory: apps/desktop/src-tauri
+        run: |
+          dmg=$(ls ${{ matrix.bundle }}/dmg/*.dmg | head -1)
+          hdiutil attach "$dmg" -mountpoint /Volumes/Nonotion -nobrowse
+          cp -R /Volumes/Nonotion/Nonotion.app /Applications/
+          hdiutil detach /Volumes/Nonotion
+          codesign --verify --deep --verbose=2 /Applications/Nonotion.app
+          binary=$(ls /Applications/Nonotion.app/Contents/MacOS/ | head -1)
+          lipo -archs "/Applications/Nonotion.app/Contents/MacOS/$binary"
+          NONOTION_SMOKE_TEST=1 "/Applications/Nonotion.app/Contents/MacOS/$binary"
+
+      - name: Installation et démarrage (Linux)
+        if: runner.os == 'Linux'
+        working-directory: apps/desktop/src-tauri
+        env:
+          WEBKIT_DISABLE_DMABUF_RENDERER: '1'
+          NONOTION_SMOKE_TEST: '1'
+        run: |
+          deb=$(ls ${{ matrix.bundle }}/deb/*.deb | head -1)
+          sudo apt-get install -y "./$deb"
+          binary=$(dpkg -L "$(dpkg-deb -f "$deb" Package)" | grep '^/usr/bin/' | head -1)
+          echo "Paquet .deb installé : $binary"
+          xvfb-run -a "$binary"
+          appimage=$(ls ${{ matrix.bundle }}/appimage/*.AppImage | head -1)
+          chmod +x "$appimage"
+          echo "AppImage : $appimage"
+          APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run -a "$appimage"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nonotion-${{ runner.os }}
+          path: |
+            apps/desktop/src-tauri/${{ matrix.bundle }}/nsis/*.exe
+            apps/desktop/src-tauri/${{ matrix.bundle }}/msi/*.msi
+            apps/desktop/src-tauri/${{ matrix.bundle }}/dmg/*.dmg
+            apps/desktop/src-tauri/${{ matrix.bundle }}/appimage/*.AppImage
+            apps/desktop/src-tauri/${{ matrix.bundle }}/deb/*.deb
+            apps/desktop/src-tauri/Cargo.lock
+          retention-days: 14

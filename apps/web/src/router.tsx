@@ -17,6 +17,7 @@ import {
 } from '@/features/auth/AuthPages'
 import { HomePage } from '@/features/home/HomePage'
 import { AppLayout } from '@/features/layout/AppLayout'
+import { UpdateNotifier } from '@/features/layout/UpdateNotifier'
 import { PageView } from '@/features/page/PageView'
 import { getToken } from '@/lib/session'
 
@@ -25,6 +26,7 @@ const rootRoute = createRootRoute({
     <TooltipProvider delayDuration={400}>
       <Outlet />
       <Toaster position="bottom-center" />
+      <UpdateNotifier />
     </TooltipProvider>
   ),
   notFoundComponent: () => (

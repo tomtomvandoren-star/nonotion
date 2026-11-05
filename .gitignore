@@ -5,6 +5,7 @@ apps/api/vendor/
 # Builds
 dist/
 dist-sandbox/
+dist-desktop/
 *.tsbuildinfo
 
 # Secrets : le .env du serveur n'est jamais versionné (spec 1.6.9)
@@ -12,6 +13,8 @@ dist-sandbox/
 .env.*
 !.env.example
 !.env.production.example
+# Adresse publique de l'API pour l'application pour ordinateur (aucun secret).
+!apps/web/.env.desktop
 deploy.env
 
 # Front compilé copié dans le public Laravel par deploy.sh

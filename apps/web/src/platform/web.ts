@@ -22,6 +22,7 @@ const userAgentData = (navigator as Navigator & { userAgentData?: { platform?: s
   .userAgentData
 
 export const webPlatform: Platform = {
+  kind: 'web',
   isMac: /mac|iphone|ipad/i.test(userAgentData?.platform ?? navigator.platform ?? ''),
   isTouch: window.matchMedia?.('(pointer: coarse)').matches ?? false,
   secureStorage: {
@@ -32,4 +33,6 @@ export const webPlatform: Platform = {
   openExternal: (url) => {
     window.open(url, '_blank', 'noopener,noreferrer')
   },
+  // Le site se met à jour à chaque déploiement : rien à installer.
+  checkForUpdate: async () => null,
 }

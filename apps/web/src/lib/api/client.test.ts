@@ -1,7 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { useSession } from '@/lib/session'
-import { ApiError, apiGet, apiRequest, apiUrl, setUnauthorizedHandler } from './client'
+import {
+  ApiError,
+  apiGet,
+  apiRequest,
+  apiUrl,
+  setUnauthorizedHandler,
+  writesSettled,
+} from './client'
 
 vi.mock('@/platform', () => ({
   platform: {
@@ -79,5 +86,32 @@ describe('apiRequest', () => {
 
     await expect(apiGet('auth/me', z.unknown())).rejects.toMatchObject({ status: 401 })
     expect(handler).toHaveBeenCalledOnce()
+  })
+
+  it('writesSettled attend que les écritures parties aient reçu leur réponse (mise à jour de l’application)', async () => {
+    let answer: (response: Response) => void = () => {}
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_url: string, init?: RequestInit) =>
+          new Promise<Response>((resolve) => {
+            if (init?.method === 'GET') resolve(Response.json({}))
+            else answer = resolve
+          }),
+      ),
+    )
+    await expect(writesSettled()).resolves.toBeUndefined()
+
+    const write = apiRequest('PATCH', 'pages/1', z.unknown(), { title: 'Notes' })
+    await apiGet('pages/1', z.unknown())
+    let settled = false
+    const waiting = writesSettled().then(() => (settled = true))
+    await Promise.resolve()
+    expect(settled).toBe(false)
+
+    answer(Response.json({}))
+    await write
+    await waiting
+    expect(settled).toBe(true)
   })
 })

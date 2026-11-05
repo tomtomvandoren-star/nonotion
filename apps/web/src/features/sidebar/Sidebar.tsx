@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import {
   ChevronsLeft,
+  Download,
   Home,
   Keyboard,
   LogOut,
@@ -36,6 +37,7 @@ import { logout } from '@/lib/api/auth'
 import { endSession } from '@/lib/session'
 import { shortcutLabel } from '@/lib/shortcuts'
 import { cn } from '@/lib/utils'
+import { platform } from '@/platform'
 import { SIDEBAR_MAX, SIDEBAR_MIN, type Theme, useUi } from '@/stores/ui'
 import { PageTree } from './PageTree'
 import { TrashPanel } from './TrashPanel'
@@ -200,6 +202,11 @@ function SidebarLink({
   )
 }
 
+/** Les installateurs Windows, macOS et Linux de la dernière version publiée (phase 8). */
+const DESKTOP_DOWNLOADS_URL =
+  import.meta.env.VITE_DESKTOP_DOWNLOADS_URL ??
+  'https://github.com/tomtomvandoren-star/nonotion/releases/latest'
+
 function WorkspaceMenu() {
   const profile = useProfile()
   const queryClient = useQueryClient()
@@ -254,6 +261,11 @@ function WorkspaceMenu() {
           <Keyboard /> Raccourcis clavier
           <span className="ml-auto text-xs text-muted-foreground">{shortcutLabel('/')}</span>
         </DropdownMenuItem>
+        {platform.kind === 'web' && (
+          <DropdownMenuItem onSelect={() => platform.openExternal(DESKTOP_DOWNLOADS_URL)}>
+            <Download /> Application pour ordinateur
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => void signOut()}>
           <LogOut /> Se déconnecter

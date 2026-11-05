@@ -1,11 +1,28 @@
 [package]
 name = "nonotion"
-version = "0.1.0"
-description = "Nonotion : bac à sable de l'éditeur (test précoce de la phase 2)"
+version = "0.8.0"
+description = "Nonotion pour Windows, macOS et Linux"
 edition = "2021"
+rust-version = "1.88"
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { version = "2.7", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2.12", features = [] }
+tauri-plugin-opener = "2.7"
+tauri-plugin-process = "2.4"
+tauri-plugin-window-state = "2.5"
+# Le jeton de connexion dans le trousseau du système (macOS, Windows, Secret Service sous Linux).
+keyring = "4.2"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2.14"
+
+[profile.release]
+# Un exécutable plus petit : moins à télécharger à chaque mise à jour.
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

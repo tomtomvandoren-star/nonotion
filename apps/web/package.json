@@ -8,6 +8,7 @@
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node.json",
     "test": "vitest run",
+    "build:desktop": "vite build --mode desktop --outDir dist-desktop",
     "build:sandbox": "vite build -c vite.sandbox.config.ts && node -e \"require('fs').renameSync('dist-sandbox/sandbox.html', 'dist-sandbox/index.html')\""
   },
   "dependencies": {
@@ -19,6 +20,10 @@
     "@nonotion/shared": "workspace:*",
     "@tanstack/react-query": "5.105.3",
     "@tanstack/react-router": "1.170.46",
+    "@tauri-apps/api": "2.12.4",
+    "@tauri-apps/plugin-opener": "2.7.2",
+    "@tauri-apps/plugin-process": "2.4.0",
+    "@tauri-apps/plugin-updater": "2.14.1",
     "class-variance-authority": "0.7.1",
     "cn": "0.5.2",
     "lucide-react": "1.67.0",

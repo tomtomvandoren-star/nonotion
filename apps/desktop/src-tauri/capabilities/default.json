@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Ce que la fenêtre de Nonotion peut demander au système : rien de plus que le nécessaire.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "opener:default",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [{ "url": "webcal://*" }]
+    },
+    "updater:default",
+    "process:allow-restart"
+  ]
+}

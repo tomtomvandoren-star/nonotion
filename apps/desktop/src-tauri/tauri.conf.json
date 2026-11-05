@@ -1,32 +1,68 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Nonotion",
-  "version": "0.1.0",
+  "version": "0.8.0",
   "identifier": "be.thomasvandoren.nonotion",
   "build": {
-    "frontendDist": "../../web/dist-sandbox"
+    "beforeDevCommand": "pnpm --filter @nonotion/web dev",
+    "devUrl": "http://localhost:5173",
+    "beforeBuildCommand": "pnpm --filter @nonotion/web build:desktop",
+    "frontendDist": "../../web/dist-desktop"
   },
   "app": {
     "windows": [
       {
-        "title": "Nonotion · éditeur (test)",
-        "width": 1100,
-        "height": 760
+        "label": "main",
+        "title": "Nonotion",
+        "width": 1280,
+        "height": 840,
+        "minWidth": 400,
+        "minHeight": 500,
+        "center": true,
+        "dragDropEnabled": false
       }
     ],
     "security": {
-      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self'",
+        "connect-src": "'self' ipc: http://ipc.localhost https://nonotion.thomasvandoren.be",
+        "img-src": "'self' data: blob: https:",
+        "media-src": "'self' blob: https:",
+        "style-src": "'self' 'unsafe-inline'",
+        "font-src": "'self' data:"
+      },
+      "dangerousDisableAssetCspModification": ["style-src"]
     }
   },
   "bundle": {
     "active": true,
-    "targets": ["appimage", "deb"],
+    "targets": ["nsis", "msi", "app", "dmg", "appimage", "deb"],
+    "category": "Productivity",
+    "shortDescription": "Pages, bases de données, tâches et agenda",
+    "longDescription": "Nonotion : des pages, des bases de données, des tâches et un agenda, enregistrés sur votre serveur.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "createUpdaterArtifacts": false,
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["French", "English"]
+      }
+    },
+    "macOS": {
+      "signingIdentity": "-",
+      "minimumSystemVersion": "10.15"
+    },
+    "linux": {
+      "deb": {
+        "section": "office"
+      }
+    }
   }
 }
