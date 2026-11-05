@@ -1,11 +1,13 @@
 import { SideMenuExtension } from '@blocknote/core/extensions'
 import {
+  AddBlockButton,
   BasicTextStyleButton,
   BlockColorsItem,
   BlockTypeSelect,
   type BlockTypeSelectItem,
   ColorStyleButton,
   CreateLinkButton,
+  DragHandleButton,
   DragHandleMenu,
   FormattingToolbar,
   RemoveBlockItem,
@@ -20,6 +22,7 @@ import { Redo2, Undo2 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { BLOCK_CHOICES } from './blockChoices'
 import { withoutIds } from './content'
+import { TouchDragHandle } from './TouchDragHandle'
 import type { NonotionBlock, NonotionEditor } from './schema'
 
 /** Les types de blocs qui gardent leur texte quand on les transforme (spec 6.3c « Transformer en… »). */
@@ -30,7 +33,14 @@ const TEXT_CHOICES = BLOCK_CHOICES.filter((choice) => choice.hasText)
  * pour déplacer le bloc et ouvre au clic le menu Supprimer, Dupliquer, Transformer en…, Couleur.
  */
 export function BlockSideMenu() {
-  return <SideMenu dragHandleMenu={BlockHandleMenu} />
+  return (
+    <SideMenu>
+      <AddBlockButton />
+      <TouchDragHandle>
+        <DragHandleButton dragHandleMenu={BlockHandleMenu} />
+      </TouchDragHandle>
+    </SideMenu>
+  )
 }
 
 function BlockHandleMenu() {

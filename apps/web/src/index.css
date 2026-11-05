@@ -346,3 +346,19 @@
     --pill-fg: #f7beb4;
   }
 }
+
+/* Glisser un bloc au doigt (TouchDragHandle) : la poignée garde le geste pour elle (pas de
+   défilement), et une ligne montre où le bloc va tomber (P4). */
+@media (pointer: coarse) {
+  .nn-touch-drag .bn-button {
+    touch-action: none;
+  }
+}
+.nn-touch-drop-line {
+  position: fixed;
+  z-index: 60;
+  height: 3px;
+  border-radius: 2px;
+  background-color: var(--accent);
+  pointer-events: none;
+}

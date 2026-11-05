@@ -352,3 +352,63 @@ test.describe('6.3b Raccourcis Markdown au clavier d’un téléphone', () => {
     await expect(editorOf(page).locator('code')).toHaveText('code')
   })
 })
+
+test.describe('6.3c Poignée de bloc au doigt', () => {
+  // Retour du test Android : la poignée ouvrait le menu mais ne déplaçait pas le bloc au doigt.
+  test('appuyer sur ⠿ puis glisser déplace le bloc ; un tap ouvre toujours le menu', async ({
+    browser,
+    browserName,
+  }) => {
+    test.skip(browserName !== 'chromium', 'toucher simulé par le protocole de Chromium')
+    const context = await browser.newContext({
+      hasTouch: true,
+      isMobile: true,
+      // Écran tactile assez large pour garder la barre latérale (le parcours d'ouverture s'en sert).
+      viewport: { width: 820, height: 900 },
+      baseURL: 'http://localhost:5173',
+    })
+    const page = await context.newPage()
+    await openEmptyPage(page, context.request)
+    for (const [i, text] of ['Un', 'Deux', 'Trois'].entries()) {
+      if (i > 0) await page.keyboard.press('Enter')
+      await page.keyboard.type(text)
+    }
+    const block = (text: string) =>
+      editorOf(page).locator('.bn-block-outer', { hasText: text }).first()
+
+    // Un tap sur le bloc fait apparaître sa poignée.
+    const trois = (await block('Trois').boundingBox())!
+    await page.touchscreen.tap(trois.x + 60, trois.y + trois.height / 2)
+    const handle = page.getByRole('button', { name: 'Glisser pour déplacer, cliquer pour le menu' })
+    await expect(handle).toBeVisible()
+
+    const from = (await handle.boundingBox())!
+    const un = (await block('Un').boundingBox())!
+    const cdp = await context.newCDPSession(page)
+    const touch = (type: string, x: number, y: number) =>
+      cdp.send('Input.dispatchTouchEvent', {
+        type,
+        touchPoints: type === 'touchEnd' ? [] : [{ x, y }],
+      })
+    await touch('touchStart', from.x + from.width / 2, from.y + from.height / 2)
+    for (let step = 1; step <= 10; step++) {
+      const y =
+        from.y +
+        from.height / 2 +
+        ((un.y + un.height * 0.75 - from.y - from.height / 2) * step) / 10
+      await touch('touchMove', from.x + 40, y)
+    }
+    await touch('touchEnd', 0, 0)
+
+    await expect
+      .poll(() => editorBlocks(page))
+      .toEqual([
+        ['paragraph', 'Un'],
+        ['paragraph', 'Trois'],
+        ['paragraph', 'Deux'],
+      ])
+    // Le relâcher n'a pas ouvert le menu ; un tap, si.
+    await expect(page.getByRole('menuitem', { name: 'Dupliquer' })).toHaveCount(0)
+    await context.close()
+  })
+})
