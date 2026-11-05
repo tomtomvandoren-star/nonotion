@@ -5,6 +5,11 @@ import { useCreatePage } from './queries'
 
 let titleFocusFor: string | null = null
 
+/** Demande que la page, à son ouverture, ait le curseur dans son titre (page ou ligne de base neuve). */
+export function requestTitleFocus(pageId: string) {
+  titleFocusFor = pageId
+}
+
 /** Une page tout juste créée s'ouvre avec le curseur dans son titre. */
 export function consumeTitleFocus(pageId: string): boolean {
   if (titleFocusFor !== pageId) return false

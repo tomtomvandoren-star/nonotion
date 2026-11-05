@@ -15,7 +15,8 @@ import {
 } from '@blocknote/react'
 import { BlockNoteView } from '@blocknote/shadcn'
 import type { PageContent } from '@nonotion/shared'
-import { SmilePlus } from 'lucide-react'
+import { Database, SmilePlus, Table2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { useEffect, useImperativeHandle, useRef } from 'react'
 import { BlockSideMenu, SelectionToolbar } from './BlockMenus'
 import { BLOCK_CHOICES, filterChoices } from './blockChoices'
@@ -68,19 +69,77 @@ function opensSlashMenu(tr: Transaction): boolean {
   return /\s/.test($from.parent.textBetween($from.parentOffset - 1, $from.parentOffset, '', ' '))
 }
 
-function slashMenuItems(editor: NonotionEditor): DefaultReactSuggestionItem[] {
+/** Ce que la page sait faire pour l'éditeur : créer une base (absent dans le bac à sable). */
+export type DatabaseActions = {
+  /** Crée une base en ligne dans la page et renvoie son identifiant. */
+  createInline: () => Promise<string>
+  /** Crée une base dans une nouvelle sous-page et l'ouvre. */
+  createFullPage: () => Promise<void>
+}
+
+function databaseItems(
+  editor: NonotionEditor,
+  databases: DatabaseActions,
+): DefaultReactSuggestionItem[] {
   return [
-    ...BLOCK_CHOICES.map((choice) => ({
-      title: choice.title,
-      subtext: choice.subtext,
-      aliases: choice.aliases,
-      group: choice.group,
-      badge: choice.badge,
-      icon: <choice.icon aria-hidden size={18} />,
+    {
+      title: 'Base de données',
+      subtext: 'Un tableau de pages avec des propriétés, dans cette page',
+      aliases: ['database', 'base', 'tableau', 'table', 'bdd', 'données'],
+      group: 'Bases de données',
+      icon: <Database aria-hidden size={18} />,
       onItemClick: () => {
-        insertOrUpdateBlockForSlashMenu(editor, choice.block as NonotionPartialBlock)
+        // Le bloc apparaît tout de suite ; la base se crée sur le serveur pendant ce temps.
+        const block = insertOrUpdateBlockForSlashMenu(editor, {
+          type: 'database',
+          props: { databaseId: '' },
+        } as NonotionPartialBlock)
+        databases
+          .createInline()
+          .then((databaseId) =>
+            editor.updateBlock(block, { props: { databaseId } } as NonotionPartialBlock),
+          )
+          .catch(() => {
+            editor.removeBlocks([block])
+            toast.error('La base de données n’a pas pu être créée.')
+          })
       },
-    })),
+    },
+    {
+      title: 'Base de données en pleine page',
+      subtext: 'Une nouvelle sous-page qui n’est qu’une base',
+      aliases: ['database', 'full page', 'pleine page', 'base', 'tableau'],
+      group: 'Bases de données',
+      icon: <Table2 aria-hidden size={18} />,
+      onItemClick: () => {
+        databases
+          .createFullPage()
+          .catch(() => toast.error('La base de données n’a pas pu être créée.'))
+      },
+    },
+  ]
+}
+
+function slashMenuItems(
+  editor: NonotionEditor,
+  databases?: DatabaseActions,
+): DefaultReactSuggestionItem[] {
+  const blocks = BLOCK_CHOICES.map((choice) => ({
+    title: choice.title,
+    subtext: choice.subtext,
+    aliases: choice.aliases,
+    group: choice.group,
+    badge: choice.badge,
+    icon: <choice.icon aria-hidden size={18} />,
+    onItemClick: () => {
+      insertOrUpdateBlockForSlashMenu(editor, choice.block as NonotionPartialBlock)
+    },
+  }))
+  // Groupes dans l'ordre de la spec 6.3a : Basique, (Médias,) Bases de données, Avancé.
+  return [
+    ...blocks.filter((item) => item.group === 'Basique'),
+    ...(databases ? databaseItems(editor, databases) : []),
+    ...blocks.filter((item) => item.group !== 'Basique'),
     {
       title: 'Émoji',
       subtext: 'Insérer un émoji (ou tapez « : » suivi de son nom)',
@@ -131,6 +190,7 @@ export default function BlockEditor({
   content,
   onChange,
   onExitTop,
+  databases,
 }: {
   ref?: React.Ref<BlockEditorHandle>
   /** Le document enregistré ; il n'est lu qu'à la création de l'éditeur. */
@@ -138,6 +198,7 @@ export default function BlockEditor({
   onChange: () => void
   /** Flèche haut au tout début du document : on revient au titre. */
   onExitTop: () => void
+  databases?: DatabaseActions
 }) {
   const exitTop = useRef(onExitTop)
   useEffect(() => {
@@ -207,7 +268,7 @@ export default function BlockEditor({
       <SuggestionMenuController
         triggerCharacter="/"
         shouldOpen={opensSlashMenu}
-        getItems={async (query) => filterChoices(slashMenuItems(editor), query)}
+        getItems={async (query) => filterChoices(slashMenuItems(editor, databases), query)}
       />
       <SideMenuController sideMenu={BlockSideMenu} floatingUIOptions={SIDE_MENU_FLOATING} />
       <FormattingToolbarController formattingToolbar={SelectionToolbar} />

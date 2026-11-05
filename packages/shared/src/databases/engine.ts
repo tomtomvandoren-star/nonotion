@@ -268,12 +268,12 @@ function compareValues(property: Property, a: unknown, b: unknown, ctx: EngineCo
  * Trie les lignes selon les règles, dans l'ordre. Les valeurs vides vont toujours à la fin, quel que
  * soit le sens : c'est là qu'on les cherche. Sans règle (ou à égalité), l'ordre manuel (`position`).
  */
-export function sortRows(
-  rows: readonly DatabaseRow[],
+export function sortRows<T extends DatabaseRow>(
+  rows: readonly T[],
   schema: readonly Property[],
   sorts: readonly SortRule[] | undefined,
   ctx: EngineContext,
-): DatabaseRow[] {
+): T[] {
   const byId = propertiesById(schema)
   const rules = (sorts ?? []).flatMap((sort) => {
     const property = byId.get(sort.property)
@@ -297,13 +297,13 @@ export function sortRows(
 }
 
 /** Les lignes d'une vue : recherche, filtres puis tris. */
-export function applyView(
-  rows: readonly DatabaseRow[],
+export function applyView<T extends DatabaseRow>(
+  rows: readonly T[],
   schema: readonly Property[],
   config: ViewConfig,
   ctx: EngineContext,
   search = '',
-): DatabaseRow[] {
+): T[] {
   const query = normalize(search.trim())
   const kept = rows.filter(
     (row) =>
@@ -314,11 +314,11 @@ export function applyView(
 }
 
 /** Une section d'une vue regroupée. `key` est l'option (ou « true »/« false »), null pour « vide ». */
-export type RowGroup = {
+export type RowGroup<T extends DatabaseRow = DatabaseRow> = {
   key: string | null
   label: string
   color: OptionColor
-  rows: DatabaseRow[]
+  rows: T[]
 }
 
 /** Les types par lesquels une vue peut être regroupée. */
@@ -334,15 +334,15 @@ export const GROUPABLE_TYPES: readonly PropertyType[] = [
  * l'ordre du schéma, plus « Sans … » pour les lignes vides (seulement s'il y en a). Une ligne à
  * plusieurs options apparaît dans chacune. `hide_empty` masque les sections sans ligne.
  */
-export function groupRows(
-  rows: readonly DatabaseRow[],
+export function groupRows<T extends DatabaseRow>(
+  rows: readonly T[],
   schema: readonly Property[],
   groupBy: GroupBy | null | undefined,
-): RowGroup[] | null {
+): RowGroup<T>[] | null {
   const property = groupBy ? propertiesById(schema).get(groupBy.property) : undefined
   if (!groupBy || !property || !GROUPABLE_TYPES.includes(property.type)) return null
 
-  let groups: RowGroup[]
+  let groups: RowGroup<T>[]
   if (property.type === 'checkbox') {
     groups = [
       { key: 'true', label: 'Cochée', color: 'default', rows: [] },
@@ -350,7 +350,7 @@ export function groupRows(
     ]
     for (const row of rows) groups[valueOf(row, property) === true ? 0 : 1]!.rows.push(row)
   } else if (hasOptions(property)) {
-    const empty: RowGroup = {
+    const empty: RowGroup<T> = {
       key: null,
       label: `Sans ${property.name}`,
       color: 'default',
@@ -359,7 +359,7 @@ export function groupRows(
     const byOption = new Map(
       property.options.map((option) => [
         option.id,
-        { key: option.id, label: option.name, color: option.color, rows: [] } as RowGroup,
+        { key: option.id, label: option.name, color: option.color, rows: [] } as RowGroup<T>,
       ]),
     )
     for (const row of rows) {

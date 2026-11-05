@@ -246,3 +246,103 @@
     display: none;
   }
 }
+
+/* Pastilles des options de sélection et de statut (spec 7) : 10 teintes, fond pastel et texte de la
+   même teinte plus foncé, rayon 3 px. */
+.nn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 3px;
+  font-size: 13px;
+  line-height: 20px;
+  white-space: nowrap;
+  color: var(--pill-fg);
+  background-color: var(--pill-bg);
+}
+.nn-pill[data-color='default'] {
+  --pill-bg: #ecebe9;
+  --pill-fg: #37352f;
+}
+.nn-pill[data-color='gray'] {
+  --pill-bg: #e3e2e0;
+  --pill-fg: #4b4a46;
+}
+.nn-pill[data-color='brown'] {
+  --pill-bg: #eee0da;
+  --pill-fg: #6b4a3a;
+}
+.nn-pill[data-color='orange'] {
+  --pill-bg: #fadec9;
+  --pill-fg: #8a4a17;
+}
+.nn-pill[data-color='yellow'] {
+  --pill-bg: #fbeebd;
+  --pill-fg: #7a5a00;
+}
+.nn-pill[data-color='green'] {
+  --pill-bg: #dbeddb;
+  --pill-fg: #2f5d3b;
+}
+.nn-pill[data-color='blue'] {
+  --pill-bg: #d3e5ef;
+  --pill-fg: #24557a;
+}
+.nn-pill[data-color='purple'] {
+  --pill-bg: #e8deee;
+  --pill-fg: #5b3f7a;
+}
+.nn-pill[data-color='pink'] {
+  --pill-bg: #f5e0e9;
+  --pill-fg: #7f3a5a;
+}
+.nn-pill[data-color='red'] {
+  --pill-bg: #ffe2dd;
+  --pill-fg: #8f2f26;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .nn-pill[data-color='default'] {
+    --pill-bg: #3a3632;
+    --pill-fg: #ede6df;
+  }
+  :root:not([data-theme='light']) .nn-pill[data-color='gray'] {
+    --pill-bg: #47443f;
+    --pill-fg: #e3e0dc;
+  }
+  :root:not([data-theme='light']) .nn-pill[data-color='brown'] {
+    --pill-bg: #4a3529;
+    --pill-fg: #e8cbbb;
+  }
+  :root:not([data-theme='light']) .nn-pill[data-color='orange'] {
+    --pill-bg: #5a3a1e;
+    --pill-fg: #f5c79c;
+  }
+  :root:not([data-theme='light']) .nn-pill[data-color='yellow'] {
+    --pill-bg: #5a4a1a;
+    --pill-fg: #f3dd8f;
+  }
+  :root:not([data-theme='light']) .nn-pill[data-color='green'] {
+    --pill-bg: #2c4632;
+    --pill-fg: #b9e0c0;
+  }
+  :root:not([data-theme='light']) .nn-pill[data-color='blue'] {
+    --pill-bg: #233f55;
+    --pill-fg: #b5d8ef;
+  }
+  :root:not([data-theme='light']) .nn-pill[data-color='purple'] {
+    --pill-bg: #3e2f52;
+    --pill-fg: #dcc8ef;
+  }
+  :root:not([data-theme='light']) .nn-pill[data-color='pink'] {
+    --pill-bg: #4f2c3d;
+    --pill-fg: #f2c3d8;
+  }
+  :root:not([data-theme='light']) .nn-pill[data-color='red'] {
+    --pill-bg: #592a24;
+    --pill-fg: #f7beb4;
+  }
+}

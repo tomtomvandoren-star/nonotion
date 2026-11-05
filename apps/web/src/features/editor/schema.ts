@@ -1,9 +1,10 @@
 import { BlockNoteSchema, createHeadingBlockSpec, defaultBlockSpecs } from '@blocknote/core'
+import { createDatabaseBlockSpec } from '@/features/databases/DatabaseBlock'
 import { createCalloutBlockSpec } from './Callout'
 
 /**
  * Les blocs de la phase 2 (spec 9) : texte, titres, listes, to-do, liste dépliable, citation,
- * séparateur, code et encadré. Les blocs médias (image, fichier…) et le tableau ne sont pas
+ * séparateur, code et encadré ; et la base de données en ligne (phase 3). Les blocs médias (image, fichier…) et le tableau ne sont pas
  * proposés tant que l'envoi de fichiers n'existe pas : un bloc qui ne marche pas n'a rien à faire
  * dans le menu.
  */
@@ -20,6 +21,7 @@ export const schema = BlockNoteSchema.create({
     codeBlock: defaultBlockSpecs.codeBlock,
     divider: defaultBlockSpecs.divider,
     callout: createCalloutBlockSpec(),
+    database: createDatabaseBlockSpec(),
   },
 })
 

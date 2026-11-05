@@ -1,6 +1,6 @@
 import type { PageDetail } from '@nonotion/shared'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { ImageIcon, SmilePlus } from 'lucide-react'
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -22,14 +22,18 @@ import {
   useUpdatePage,
   useWorkspaceId,
 } from '@/features/pages/queries'
+import { applyRowPatchLocally, databaseKey } from '@/features/databases/queries'
+import { RowProperties } from '@/features/databases/RowProperties'
 // Types seulement : BlockNote ne doit pas entrer dans le premier chargement de l'application.
-import type { BlockEditorHandle } from '@/features/editor/BlockEditor'
+import type { BlockEditorHandle, DatabaseActions } from '@/features/editor/BlockEditor'
 import type { NonotionBlock } from '@/features/editor/schema'
-import { consumeTitleFocus } from '@/features/pages/useNewPage'
+import { consumeTitleFocus, requestTitleFocus } from '@/features/pages/useNewPage'
 import { ApiError } from '@/lib/api/client'
+import { createDatabase } from '@/lib/api/databases'
 import { savePageContent } from '@/lib/api/pages'
 import { useDebouncedSave } from '@/lib/useDebouncedSave'
 import { cn } from '@/lib/utils'
+import { useUi } from '@/stores/ui'
 import { CoverPicker } from './CoverPicker'
 import { coverStyle, randomCover } from './covers'
 import { IconPicker } from './IconPicker'
@@ -41,7 +45,14 @@ const BlockEditor = lazy(() => import('@/features/editor/BlockEditor'))
  * Une page (spec 6.2) : couverture, icône, titre, puis le corps. Elle doit ressembler
  * à un document, pas à un formulaire.
  */
-export function PageView({ pageId }: { pageId: string }) {
+export function PageView({
+  pageId,
+  variant = 'page',
+}: {
+  pageId: string
+  /** « peek » : ouverte en aperçu depuis une base, avec moins de marge en haut. */
+  variant?: 'page' | 'peek'
+}) {
   const page = usePage(pageId)
 
   if (page.isPending)
@@ -64,10 +75,10 @@ export function PageView({ pageId }: { pageId: string }) {
   }
 
   // La clé remet l'état local à zéro quand on passe d'une page à l'autre.
-  return <PageDocument key={page.data.id} page={page.data} />
+  return <PageDocument key={page.data.id} page={page.data} variant={variant} />
 }
 
-function PageDocument({ page }: { page: PageDetail }) {
+function PageDocument({ page, variant }: { page: PageDetail; variant: 'page' | 'peek' }) {
   const updatePage = useUpdatePage()
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const editorRef = useRef<BlockEditorHandle>(null)
@@ -99,7 +110,9 @@ function PageDocument({ page }: { page: PageDetail }) {
       {/* Texte sur 700 px au plus ; les marges de 56 px accueillent le « + » et la poignée des blocs
           (40 px à gauche sur téléphone, où seule la poignée reste). */}
       <div className="mx-auto w-full max-w-[812px] pr-4 pl-10 md:px-14">
-        <header className={cn('group/header', cover ? 'pt-0' : 'pt-16')}>
+        <header
+          className={cn('group/header', cover ? 'pt-0' : variant === 'peek' ? 'pt-6' : 'pt-16')}
+        >
           {page.icon && (
             <IconPicker
               onSelect={(icon) => patch({ icon })}
@@ -146,6 +159,9 @@ function PageDocument({ page }: { page: PageDetail }) {
             </div>
           )}
         </header>
+
+        {/* Une ligne de base : ses propriétés en grille, entre le titre et le corps (spec 6.2, 6.4). */}
+        {page.database_id && <RowProperties page={page} />}
 
         <PageBody page={page} editorRef={editorRef} onExitTop={() => focusEnd(titleRef.current)} />
       </div>
@@ -214,6 +230,9 @@ function PageTitle({
         const title = event.target.value.replace(/\n/g, ' ')
         setValue(title)
         applyPagePatchLocally(queryClient, workspaceId, page.id, { title })
+        // Une ligne de base : son titre suit aussi dans le tableau et les autres vues.
+        if (page.database_id)
+          applyRowPatchLocally(queryClient, page.database_id, page.id, { title })
         save.schedule(title)
       }}
       onKeyDown={(event) => {
@@ -249,8 +268,29 @@ function PageBody({
   onExitTop: () => void
 }) {
   const queryClient = useQueryClient()
+  const workspaceId = useWorkspaceId() ?? ''
+  const navigate = useNavigate()
+  const setExpanded = useUi((s) => s.setExpanded)
   const version = useRef(page.version)
   const queue = useRef<Promise<void>>(Promise.resolve())
+
+  /** « /base de données » (spec 6.4) : en ligne dans cette page, ou dans une nouvelle sous-page. */
+  const databases: DatabaseActions = {
+    createInline: async () => {
+      const { data } = await createDatabase(workspaceId, { page_id: page.id })
+      queryClient.setQueryData(databaseKey(data.id), data)
+      return data.id
+    },
+    createFullPage: async () => {
+      const created = await createDatabase(workspaceId, { page_id: page.id, full_page: true })
+      queryClient.setQueryData(databaseKey(created.data.id), created.data)
+      queryClient.setQueryData(queryKeys.page(created.page.id), created.page)
+      await queryClient.invalidateQueries({ queryKey: queryKeys.tree(workspaceId) })
+      setExpanded(page.id, true)
+      requestTitleFocus(created.page.id)
+      void navigate({ to: '/p/$pageId', params: { pageId: created.page.id } })
+    },
+  }
   const [conflict, setConflict] = useState<{
     document: NonotionBlock[]
     serverVersion: number
@@ -347,6 +387,7 @@ function PageBody({
             content={initial.content}
             onChange={() => save.schedule(undefined)}
             onExitTop={onExitTop}
+            databases={databases}
           />
         </Suspense>
       </div>

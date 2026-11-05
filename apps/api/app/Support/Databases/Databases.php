@@ -18,9 +18,14 @@ use Illuminate\Validation\ValidationException;
 class Databases
 {
     /** Le bloc de l'éditeur qui affiche une base dans le document d'une page. */
-    public static function block(string $databaseId): array
+    public static function block(string $databaseId, bool $fullPage = false): array
     {
-        return ['id' => (string) Str::uuid(), 'type' => 'database', 'props' => ['databaseId' => $databaseId], 'children' => []];
+        return [
+            'id' => (string) Str::uuid(),
+            'type' => 'database',
+            'props' => ['databaseId' => $databaseId, 'fullPage' => $fullPage],
+            'children' => [],
+        ];
     }
 
     /**
@@ -65,7 +70,7 @@ class Databases
             }
 
             if ($fullPage) {
-                $container->forceFill(['content' => [self::block($database->id)]])->save();
+                $container->forceFill(['content' => [self::block($database->id, fullPage: true)]])->save();
             }
 
             return [$database, $container];
