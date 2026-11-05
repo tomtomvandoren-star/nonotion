@@ -30,15 +30,38 @@ import { formatDate } from './values'
 export const databaseKey = (databaseId: string) => ['database', databaseId] as const
 
 /** Configurations de vues modifiées ici et pas encore envoyées (voir useUpdateViewConfig). */
-const pendingConfigs = new Map<string, { timer: ReturnType<typeof setTimeout>; send: () => void }>()
+type PendingConfig = {
+  timer: ReturnType<typeof setTimeout>
+  config: ViewConfig
+  send: (config: ViewConfig) => void
+}
+const pendingConfigs = new Map<string, PendingConfig>()
 
 /** Quitter, recharger ou masquer la page envoie tout de suite ce qui attendait encore. */
 function flushPendingConfigs() {
   for (const [viewId, pending] of pendingConfigs) {
     clearTimeout(pending.timer)
     pendingConfigs.delete(viewId)
-    pending.send()
+    pending.send(pending.config)
   }
+}
+
+/**
+ * Notre configuration pas encore envoyée, plus les colonnes que le serveur vient d'y ajouter
+ * (une propriété créée entre-temps) : sinon la nouvelle colonne n'apparaîtrait pas.
+ */
+function mergePendingConfig(
+  pending: PendingConfig,
+  server: DatabaseView,
+  knownIds: ReadonlySet<string>,
+): ViewConfig {
+  const ours = pending.config.visible_properties
+  const added = (server.config.visible_properties ?? []).filter(
+    (id) => !knownIds.has(id) && !ours?.includes(id),
+  )
+  if (ours && added.length > 0)
+    pending.config = { ...pending.config, visible_properties: [...ours, ...added] }
+  return pending.config
 }
 window.addEventListener('pagehide', flushPendingConfigs)
 document.addEventListener('visibilitychange', () => {
@@ -207,16 +230,18 @@ export function usePropertyMutation(databaseId: string) {
     // Le serveur renvoie la base entière. Une configuration de vue pas encore envoyée reste la nôtre,
     // et les lignes aussi quand la modification ne les touche pas : une valeur saisie entre-temps
     // (encore en route vers le serveur) ne doit pas disparaître.
-    onSuccess: (database, _change, context) =>
-      queryClient.setQueryData<DatabaseDetail>(databaseKey(databaseId), (current) => ({
+    onSuccess: (database, _change, context) => {
+      const current = queryClient.getQueryData<DatabaseDetail>(databaseKey(databaseId))
+      const known = new Set(current?.schema.map((property) => property.id))
+      queryClient.setQueryData<DatabaseDetail>(databaseKey(databaseId), {
         ...database,
         rows: context?.keepRows && current ? current.rows : database.rows,
-        views: database.views.map((view) =>
-          pendingConfigs.has(view.id)
-            ? (current?.views.find((v) => v.id === view.id) ?? view)
-            : view,
-        ),
-      })),
+        views: database.views.map((view) => {
+          const pending = pendingConfigs.get(view.id)
+          return pending ? { ...view, config: mergePendingConfig(pending, view, known) } : view
+        }),
+      })
+    },
     onError: (_error, _change, context) => {
       context?.undo()
       toast.error('La propriété n’a pas pu être enregistrée.')
@@ -269,14 +294,15 @@ export function useUpdateViewConfig(databaseId: string) {
   return (view: DatabaseView, config: ViewConfig) => {
     replaceView(queryClient, databaseId, { ...view, config })
     clearTimeout(pendingConfigs.get(view.id)?.timer)
-    const send = () => save.mutate({ viewId: view.id, config })
-    pendingConfigs.set(view.id, {
-      send,
+    const pending: PendingConfig = {
+      config,
+      send: (latest) => save.mutate({ viewId: view.id, config: latest }),
       timer: setTimeout(() => {
         pendingConfigs.delete(view.id)
-        send()
+        pending.send(pending.config)
       }, 400),
-    })
+    }
+    pendingConfigs.set(view.id, pending)
   }
 }
 

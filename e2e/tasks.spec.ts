@@ -97,6 +97,7 @@ test.describe('6.7 La base « Tâches »', () => {
       await row(table, title).getByRole('button', { name: 'Échéance' }).click()
       await page.getByLabel('Date de début').fill(day)
       await page.getByRole('button', { name: 'OK' }).click()
+      await expect(page.getByLabel('Date de début')).toHaveCount(0)
     }
     await page.getByRole('checkbox', { name: 'Terminé : Banque' }).check()
 
@@ -190,7 +191,8 @@ test.describe('6.11 Vue Board', () => {
     await addCards(page, 'En cours', ['Rédiger'])
     await addCards(page, 'À faire', ['Premier', 'Second'])
 
-    // Vers une autre colonne : le Statut change.
+    // Vers une autre colonne : le Statut change. Le Board défile pour montrer « Terminé ».
+    await column(page, 'Terminé').scrollIntoViewIfNeeded()
     const done = (await column(page, 'Terminé').boundingBox())!
     await dragTo(
       page,
@@ -202,6 +204,7 @@ test.describe('6.11 Vue Board', () => {
     await expect(cards(column(page, 'En cours'))).toHaveCount(0)
 
     // Dans la colonne : « Second » passe en tête.
+    await column(page, 'À faire').scrollIntoViewIfNeeded()
     const todo = cards(column(page, 'À faire'))
     const top = (await todo.first().boundingBox())!
     await dragTo(page, todo.filter({ hasText: 'Second' }), top.x + top.width / 2, top.y + 4)
