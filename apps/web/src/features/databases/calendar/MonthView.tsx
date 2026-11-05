@@ -15,6 +15,8 @@ export type GridProps = {
   today: Day
   items: CalendarItem[]
   completion: Completion | null
+  /** La couleur de l'agenda importé d'un élément (null : un élément de la base). */
+  colorOf: (item: CalendarItem) => string | null
   onOpen: (rowId: string) => void
   onCreate: (day: Day) => void
   onDragStart: (event: React.PointerEvent, what: DragStart) => void
@@ -58,6 +60,7 @@ function MonthWeek({
   today,
   items,
   completion,
+  colorOf,
   onOpen,
   onCreate,
   onDragStart,
@@ -107,6 +110,7 @@ function MonthWeek({
                 count={hidden}
                 items={items.filter((item) => overlaps(item, day, day))}
                 completion={completion}
+                colorOf={colorOf}
                 onOpen={onOpen}
               />
             )}
@@ -124,8 +128,9 @@ function MonthWeek({
             completion={completion}
             continuesBefore={segment.continuesBefore}
             continuesAfter={segment.continuesAfter}
+            color={colorOf(segment.item)}
             onOpen={() => onOpen(segment.item.row.id)}
-            onDragStart={onDragStart}
+            onDragStart={colorOf(segment.item) ? undefined : onDragStart}
             className="pointer-events-auto mx-px"
             style={{
               gridColumn: `${segment.startCol + 1} / ${segment.endCol + 2}`,
@@ -144,12 +149,14 @@ function MoreItems({
   count,
   items,
   completion,
+  colorOf,
   onOpen,
 }: {
   day: Day
   count: number
   items: CalendarItem[]
   completion: Completion | null
+  colorOf: (item: CalendarItem) => string | null
   onOpen: (rowId: string) => void
 }) {
   return (
@@ -172,6 +179,7 @@ function MoreItems({
               key={item.row.id}
               item={item}
               completion={completion}
+              color={colorOf(item)}
               onOpen={() => onOpen(item.row.id)}
             />
           ))}

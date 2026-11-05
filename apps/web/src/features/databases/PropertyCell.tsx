@@ -22,6 +22,7 @@ export function PropertyCell({
   onEndEdit,
   onChange,
   variant = 'cell',
+  readOnly = false,
   className,
 }: {
   database: DatabaseDetail
@@ -32,12 +33,28 @@ export function PropertyCell({
   onEndEdit: (end: EditEnd) => void
   onChange: (value: unknown) => void
   variant?: 'cell' | 'field'
+  /** Une valeur qui vient d'un agenda importé : elle se modifie dans l'agenda d'origine. */
+  readOnly?: boolean
   className?: string
 }) {
   const properties = usePropertyMutation(database.id)
   const queryClient = useQueryClient()
   const creating = useRef<Promise<void>>(Promise.resolve())
   const label = property.name
+
+  if (readOnly)
+    return (
+      <div
+        title="Vient de l’agenda importé : modifiable dans l’agenda d’origine"
+        className={cn(
+          'flex w-full min-w-0 items-center text-muted-foreground',
+          variant === 'cell' ? 'h-full min-h-8 px-2' : 'min-h-8 px-1.5 py-1',
+          className,
+        )}
+      >
+        <PropertyValueView property={property} value={value} compact={variant === 'cell'} />
+      </div>
+    )
 
   if (property.type === 'checkbox') {
     return (

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CalendarSourceController;
 use App\Http\Controllers\CronController;
 use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\HealthController;
@@ -55,4 +56,14 @@ Route::middleware(['auth:sanctum', 'throttle:240,1'])->group(function () {
     Route::patch('/views/{view}', [ViewController::class, 'update']);
     Route::post('/views/{view}/duplicate', [ViewController::class, 'duplicate']);
     Route::delete('/views/{view}', [ViewController::class, 'destroy']);
+
+    Route::patch('/calendar-sources/{source}', [CalendarSourceController::class, 'update']);
+    Route::delete('/calendar-sources/{source}', [CalendarSourceController::class, 'destroy']);
+});
+
+// Agendas par lien ICS (spec 6.9) : chaque appel télécharge un fichier distant, d'où une limite basse.
+Route::middleware(['auth:sanctum', 'throttle:20,1'])->group(function () {
+    Route::post('/calendar-sources/preview', [CalendarSourceController::class, 'preview']);
+    Route::post('/calendar-sources', [CalendarSourceController::class, 'store']);
+    Route::post('/calendar-sources/{source}/sync', [CalendarSourceController::class, 'sync']);
 });

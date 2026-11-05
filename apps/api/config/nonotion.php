@@ -29,4 +29,20 @@ return [
         'password' => env('CRON_PASSWORD'),
     ],
 
+    /*
+    | Import d'agendas par lien ICS (spec 6.9).
+    | allow_private_hosts : adresses locales autorisées malgré la protection SSRF (« 127.0.0.1:8765 »),
+    | pour les tests de bout en bout seulement ; jamais prises en compte en production.
+    */
+    'ics' => [
+        'timeout' => 10,
+        'max_bytes' => 10 * 1024 * 1024,
+        'max_redirects' => 3,
+        'window_past_days' => 31,
+        'window_future_days' => 366,
+        'batch_size' => 200,
+        'sync_every_minutes' => 30,
+        'allow_private_hosts' => array_filter(explode(',', (string) env('ICS_ALLOW_PRIVATE_HOSTS', ''))),
+    ],
+
 ];

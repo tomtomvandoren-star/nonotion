@@ -1,5 +1,5 @@
-import { newProperty, type PageDetail } from '@nonotion/shared'
-import { Plus } from 'lucide-react'
+import { importedLocks, newProperty, type PageDetail } from '@nonotion/shared'
+import { CalendarDays, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { AddPropertyButton } from './ColumnHeader'
 import { PropertyCell } from './PropertyCell'
@@ -22,9 +22,21 @@ export function RowProperties({ page }: { page: PageDetail }) {
   const row = database.data.rows.find((item) => item.id === page.id)
   const values = row?.properties ?? page.properties ?? {}
   const shown = database.data.schema.filter((property) => property.type !== 'title')
+  const locked = importedLocks(database.data, row ?? page)
+  const source = database.data.sources.find((item) => item.id === (row ?? page).calendar_source_id)
 
   return (
     <div role="list" aria-label="Propriétés" className="my-3 grid gap-0.5">
+      {source && (
+        // Un événement importé (spec 6.9) : son titre, sa date, son lieu et son lien suivent l'agenda.
+        <p className="mb-1 flex items-center gap-1.5 rounded-sm bg-muted/60 px-2 py-1.5 text-xs text-muted-foreground">
+          <CalendarDays aria-hidden className="size-3.5 shrink-0" />
+          <span>
+            Importé de l’agenda « {source.name} » ({source.url_host}) : le titre, la date, le lieu
+            et le lien se modifient dans l’agenda d’origine.
+          </span>
+        </p>
+      )}
       {shown.map((property) => (
         <div role="listitem" key={property.id} className="flex min-h-8 items-start gap-2">
           <div className="flex w-36 shrink-0 items-center gap-1.5 py-1.5 text-sm text-muted-foreground md:w-44">
@@ -37,6 +49,7 @@ export function RowProperties({ page }: { page: PageDetail }) {
               property={property}
               value={values[property.id]}
               variant="field"
+              readOnly={locked.has(property.id)}
               editing={editing === property.id}
               onStartEdit={() => setEditing(property.id)}
               onEndEdit={(end) => {

@@ -101,6 +101,8 @@ export const viewConfigSchema = z.object({
   calendar_by: propertyIdSchema.nullable().optional(),
   /** Calendrier : un mois ou une semaine (spec 6.8). */
   calendar_mode: z.enum(['month', 'week']).optional(),
+  /** Calendrier : les agendas importés masqués (« Mes agendas »). */
+  hidden_sources: z.array(z.string().max(32)).max(100).optional(),
   open_pages_in: z.enum(OPEN_PAGES_IN).optional(),
   card_size: z.enum(['small', 'medium', 'large']).optional(),
 })

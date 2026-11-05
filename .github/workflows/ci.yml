@@ -106,6 +106,8 @@ jobs:
         timeout-minutes: 12
         env:
           DB_DATABASE: nonotion_test
+          # Le petit serveur d'agendas des tests d'import ICS (un port par processus de test).
+          ICS_ALLOW_PRIVATE_HOSTS: 127.0.0.1:8765,127.0.0.1:8766,127.0.0.1:8767,127.0.0.1:8768
         run: |
           php apps/api/artisan migrate:fresh --force
           pnpm test:e2e

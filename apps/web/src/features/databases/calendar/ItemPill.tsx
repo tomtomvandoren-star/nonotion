@@ -17,11 +17,14 @@ export function ItemPill({
   continuesAfter = false,
   onOpen,
   onDragStart,
+  color,
   className,
   style,
 }: {
   item: CalendarItem
   completion: Completion | null
+  /** La couleur de l'agenda importé d'où vient l'élément. */
+  color?: string | null
   continuesBefore?: boolean
   continuesAfter?: boolean
   onOpen: () => void
@@ -41,6 +44,7 @@ export function ItemPill({
         type="button"
         data-calendar-item={item.row.id}
         data-day-start={item.startDay}
+        data-color={color ?? undefined}
         aria-label={`${displayTitle(item.row.title)}, ${formatDate(item.value as DateValue)}`}
         onClick={onOpen}
         onPointerDown={(event) =>
@@ -49,13 +53,24 @@ export function ItemPill({
         className={cn(
           'flex h-[22px] min-w-0 flex-1 items-center gap-1 overflow-hidden px-1.5 text-left text-xs select-none [-webkit-touch-callout:none]',
           bar
-            ? 'rounded-sm bg-primary/15 font-medium text-foreground hover:bg-primary/25'
+            ? color
+              ? 'nn-tint rounded-sm font-medium hover:brightness-95'
+              : 'rounded-sm bg-primary/15 font-medium text-foreground hover:bg-primary/25'
             : 'rounded-sm hover:bg-accent',
           bar && continuesBefore && 'rounded-l-none',
           bar && continuesAfter && 'rounded-r-none',
         )}
       >
-        {!bar && <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-primary" />}
+        {!bar && (
+          <span
+            aria-hidden
+            data-color={color ?? undefined}
+            className={cn(
+              'size-1.5 shrink-0 rounded-full',
+              color ? 'nn-tint brightness-75' : 'bg-primary',
+            )}
+          />
+        )}
         {time && <span className="shrink-0 text-muted-foreground tabular-nums">{time}</span>}
         <span className="nn-task-title truncate">{displayTitle(item.row.title)}</span>
       </button>

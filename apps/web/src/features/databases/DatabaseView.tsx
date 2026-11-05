@@ -11,12 +11,16 @@ import {
   type ViewConfig,
 } from '@nonotion/shared'
 import { useNavigate } from '@tanstack/react-router'
-import { useMemo, useState } from 'react'
+import { Link2, Plus } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { requestTitleFocus } from '@/features/pages/useNewPage'
 import { ApiError } from '@/lib/api/client'
 import { useUi } from '@/stores/ui'
 import { BoardView } from './BoardView'
 import { CalendarControls } from './calendar/CalendarControls'
+import { useSyncCalendar } from './calendar/calendarQueries'
+import { ImportCalendarDialog } from './calendar/ImportCalendarDialog'
 import { CalendarView } from './calendar/CalendarView'
 import { calendarProperty, type Day, monthWeeks, weekDays } from './calendar/dates'
 import type { ColumnAction } from './ColumnHeader'
@@ -30,6 +34,32 @@ import { ViewTabs } from './ViewTabs'
 import { ViewToolbar } from './ViewToolbar'
 
 const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+
+/** Les agendas déjà resynchronisés à l'ouverture, pendant cette session. */
+const syncedOnOpen = new Set<string>()
+
+/**
+ * Synchronisation à l'ouverture (spec 6.9) : un agenda en abonnement qui n'a pas été resynchronisé
+ * depuis plus de 15 minutes l'est maintenant, sans attendre le planificateur.
+ */
+function useSyncOnOpen(database: DatabaseDetail) {
+  const sync = useSyncCalendar(database.id)
+  useEffect(() => {
+    const stale = database.sources.filter(
+      (source) =>
+        source.mode === 'subscription' &&
+        source.status !== 'error' &&
+        !syncedOnOpen.has(source.id) &&
+        (!source.last_sync_at || Date.now() - Date.parse(source.last_sync_at) > 15 * 60_000),
+    )
+    for (const source of stale) {
+      syncedOnOpen.add(source.id)
+      sync.mutate(source.id)
+    }
+    // La synchronisation n'a lieu qu'une fois par agenda : la fonction de mutation peut changer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [database.sources])
+}
 
 /** Une base de données affichée dans une page (spec 6.4 à 6.6) : titre, onglets, barre d'outils, vue. */
 export function DatabaseView({
@@ -70,6 +100,8 @@ function LoadedDatabase({ database, showTitle }: { database: DatabaseDetail; sho
   const [title, setTitle] = useState(database.title)
   // La période affichée par un calendrier : elle reste la même quand on bascule Mois | Semaine.
   const [anchor, setAnchor] = useState(() => todayIn(timeZone))
+  const [importing, setImporting] = useState(false)
+  useSyncOnOpen(database)
 
   const view =
     database.views.find((item) => item.id === activeViews[database.id]) ?? database.views[0]!
@@ -181,6 +213,20 @@ function LoadedDatabase({ database, showTitle }: { database: DatabaseDetail; sho
               // « Ajouter » date l'élément d'aujourd'hui s'il est à l'écran, sinon de la période.
               onNew: () => void createOn(visibleDays.includes(ctx.today) ? ctx.today : anchor),
               newLabel: 'Ajouter',
+              newMenu: (
+                <>
+                  <DropdownMenuItem
+                    onSelect={() =>
+                      void createOn(visibleDays.includes(ctx.today) ? ctx.today : anchor)
+                    }
+                  >
+                    <Plus aria-hidden /> Nouvel événement
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setImporting(true)}>
+                    <Link2 aria-hidden /> Importer un agenda depuis un lien (ICS)
+                  </DropdownMenuItem>
+                </>
+              ),
               leading: (
                 <CalendarControls
                   mode={calendarMode}
@@ -210,6 +256,7 @@ function LoadedDatabase({ database, showTitle }: { database: DatabaseDetail; sho
       ) : (
         <TableView {...body} />
       )}
+      <ImportCalendarDialog database={database} open={importing} onOpenChange={setImporting} />
       {peek && (
         <RowPeek
           rowId={peek}

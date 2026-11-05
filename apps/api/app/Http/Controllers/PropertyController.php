@@ -38,16 +38,7 @@ class PropertyController extends Controller
             if (count($database->schema) >= 100) {
                 throw ValidationException::withMessages(['property' => 'Une base compte au plus 100 propriétés.']);
             }
-            $database->update(['schema' => [...$database->schema, $property]]);
-
-            // Les vues qui listent leurs colonnes affichent aussi la nouvelle.
-            foreach (View::query()->where('database_id', $database->id)->get() as $view) {
-                if (isset($view->config['visible_properties'])) {
-                    $config = $view->config;
-                    $config['visible_properties'][] = $property['id'];
-                    $view->update(['config' => $config]);
-                }
-            }
+            Databases::appendProperty($database, $property);
         });
 
         return response()->json(['data' => Databases::detail($database->refresh())], 201);

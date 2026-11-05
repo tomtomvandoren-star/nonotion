@@ -18,6 +18,7 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  ChevronDown,
   Ellipsis,
   ListFilter,
   Plus,
@@ -65,6 +66,7 @@ export function ViewToolbar({
   onNew,
   leading,
   newLabel = 'Nouveau',
+  newMenu,
 }: {
   database: DatabaseDetail
   view: DatabaseView
@@ -77,6 +79,8 @@ export function ViewToolbar({
   /** À gauche : les commandes propres à la vue (la période d'un calendrier). */
   leading?: React.ReactNode
   newLabel?: string
+  /** Les éléments du menu ▾ du bouton (« Importer un agenda… ») ; sans eux, pas de flèche. */
+  newMenu?: React.ReactNode
 }) {
   const config = view.config
   const byId = propertiesById(database.schema)
@@ -164,13 +168,31 @@ export function ViewToolbar({
 
       <OptionsMenu database={database} view={view} onConfig={onConfig} />
 
-      <button
-        type="button"
-        onClick={onNew}
-        className="ml-1 flex h-7 items-center gap-1 rounded-sm bg-primary px-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-      >
-        <Plus aria-hidden className="size-4" /> {newLabel}
-      </button>
+      <div className="ml-1 flex h-7 items-stretch overflow-hidden rounded-sm bg-primary text-sm font-medium text-primary-foreground">
+        <button
+          type="button"
+          onClick={onNew}
+          className="flex items-center gap-1 px-2.5 hover:bg-primary/90"
+        >
+          <Plus aria-hidden className="size-4" /> {newLabel}
+        </button>
+        {newMenu && (
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label={`Autres façons d’${newLabel === 'Ajouter' ? 'ajouter' : 'ajouter un élément'}`}
+                className="flex items-center border-l border-primary-foreground/25 px-1 hover:bg-primary/90"
+              >
+                <ChevronDown aria-hidden className="size-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              {newMenu}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
     </div>
   )
 }

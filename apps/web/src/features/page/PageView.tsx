@@ -233,6 +233,12 @@ function PageTitle({
       ref={ref}
       rows={1}
       value={value}
+      readOnly={Boolean(page.calendar_source_id)}
+      title={
+        page.calendar_source_id
+          ? 'Vient de l’agenda importé : modifiable dans l’agenda d’origine'
+          : undefined
+      }
       placeholder="Sans titre"
       aria-label="Titre de la page"
       onChange={(event) => {

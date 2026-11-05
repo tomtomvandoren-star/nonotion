@@ -6,7 +6,13 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
-import { type DatabaseRowData, newProperty, type Property, type RowGroup } from '@nonotion/shared'
+import {
+  type DatabaseRowData,
+  importedLocks,
+  newProperty,
+  type Property,
+  type RowGroup,
+} from '@nonotion/shared'
 import { ChevronRight, Maximize2, Plus } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { PageGlyph } from '@/features/pages/PageGlyph'
@@ -112,61 +118,67 @@ export function TableView({
     updateConfig(view, { ...config, visible_properties: ids })
   }
 
-  const renderRow = (row: DatabaseRowData, orderedRows: DatabaseRowData[]) => (
-    <tr
-      key={row.id}
-      data-row-id={row.id}
-      data-done={completion?.isDone(row) || undefined}
-      className="group/row hover:bg-accent/40"
-    >
-      {columns.map((property) => {
-        const isEditing = editing?.rowId === row.id && editing.propertyId === property.id
-        const value = property.type === 'title' ? row.title : row.properties[property.id]
-        const cell = (
-          <PropertyCell
-            database={database}
-            property={property}
-            value={value}
-            editing={isEditing}
-            onStartEdit={() => setEditing({ rowId: row.id, propertyId: property.id })}
-            onEndEdit={(end) => endEdit(orderedRows, end)}
-            onChange={(next) => saveValue(row, property, next)}
-            className={property.type === 'checkbox' ? 'px-2' : undefined}
-          />
-        )
-        return (
-          <td
-            key={property.id}
-            style={{ width: width(property), maxWidth: width(property) }}
-            className="h-8 border-r border-b border-border p-0 align-middle text-sm"
-          >
-            {property.type === 'title' ? (
-              <div className="flex h-full items-center">
-                {/* La case « c'est fait » en tête de ligne (spec 6.7). */}
-                {completion && <TaskCheckbox row={row} completion={completion} className="ml-2" />}
-                {row.icon && <PageGlyph icon={row.icon} className="ml-2 text-sm" />}
-                <div className="nn-task-title min-w-0 flex-1 font-medium">{cell}</div>
-                {!isEditing && (
-                  // Au survol (P2), visible en permanence au doigt.
-                  <button
-                    type="button"
-                    onClick={() => onOpenRow(row.id)}
-                    aria-label={`Ouvrir ${row.title || 'Sans titre'}`}
-                    className="mr-1 flex h-6 shrink-0 items-center gap-1 rounded-sm border border-border bg-background px-1.5 text-xs text-muted-foreground opacity-0 transition-opacity group-hover/row:opacity-100 hover:bg-accent focus-visible:opacity-100 touch:opacity-100"
-                  >
-                    <Maximize2 aria-hidden className="size-3" /> Ouvrir
-                  </button>
-                )}
-              </div>
-            ) : (
-              cell
-            )}
-          </td>
-        )
-      })}
-      <td className="border-b border-border" />
-    </tr>
-  )
+  const renderRow = (row: DatabaseRowData, orderedRows: DatabaseRowData[]) => {
+    const locked = importedLocks(database, row)
+    return (
+      <tr
+        key={row.id}
+        data-row-id={row.id}
+        data-done={completion?.isDone(row) || undefined}
+        className="group/row hover:bg-accent/40"
+      >
+        {columns.map((property) => {
+          const isEditing = editing?.rowId === row.id && editing.propertyId === property.id
+          const value = property.type === 'title' ? row.title : row.properties[property.id]
+          const cell = (
+            <PropertyCell
+              database={database}
+              property={property}
+              value={value}
+              editing={isEditing}
+              onStartEdit={() => setEditing({ rowId: row.id, propertyId: property.id })}
+              onEndEdit={(end) => endEdit(orderedRows, end)}
+              onChange={(next) => saveValue(row, property, next)}
+              readOnly={locked.has(property.type === 'title' ? 'title' : property.id)}
+              className={property.type === 'checkbox' ? 'px-2' : undefined}
+            />
+          )
+          return (
+            <td
+              key={property.id}
+              style={{ width: width(property), maxWidth: width(property) }}
+              className="h-8 border-r border-b border-border p-0 align-middle text-sm"
+            >
+              {property.type === 'title' ? (
+                <div className="flex h-full items-center">
+                  {/* La case « c'est fait » en tête de ligne (spec 6.7). */}
+                  {completion && (
+                    <TaskCheckbox row={row} completion={completion} className="ml-2" />
+                  )}
+                  {row.icon && <PageGlyph icon={row.icon} className="ml-2 text-sm" />}
+                  <div className="nn-task-title min-w-0 flex-1 font-medium">{cell}</div>
+                  {!isEditing && (
+                    // Au survol (P2), visible en permanence au doigt.
+                    <button
+                      type="button"
+                      onClick={() => onOpenRow(row.id)}
+                      aria-label={`Ouvrir ${row.title || 'Sans titre'}`}
+                      className="mr-1 flex h-6 shrink-0 items-center gap-1 rounded-sm border border-border bg-background px-1.5 text-xs text-muted-foreground opacity-0 transition-opacity group-hover/row:opacity-100 hover:bg-accent focus-visible:opacity-100 touch:opacity-100"
+                    >
+                      <Maximize2 aria-hidden className="size-3" /> Ouvrir
+                    </button>
+                  )}
+                </div>
+              ) : (
+                cell
+              )}
+            </td>
+          )
+        })}
+        <td className="border-b border-border" />
+      </tr>
+    )
+  }
 
   const sections: {
     group: RowGroup<DatabaseRowData> | null

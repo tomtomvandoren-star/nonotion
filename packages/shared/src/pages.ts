@@ -24,6 +24,8 @@ export const pageDetailSchema = pageTreeItemSchema.extend({
   /** Si la page est une ligne de base de données (spec 6.4) : sa base et ses valeurs. */
   database_id: z.string().nullable().optional(),
   properties: z.record(z.string(), z.unknown()).nullable().optional(),
+  /** Un événement importé d'un agenda (spec 6.9) : son titre suit l'agenda d'origine. */
+  calendar_source_id: z.string().nullable().optional(),
   cover_url: z.string().nullable(),
   content: pageContentSchema,
   version: z.number().int().min(1),

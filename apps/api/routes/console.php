@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\TrashController;
+use App\Support\Calendars\CalendarImporter;
 use App\Support\Heartbeat;
 use Illuminate\Support\Facades\Schedule;
 
@@ -17,3 +18,9 @@ Schedule::call(fn () => Heartbeat::record(Heartbeat::CRON))
 Schedule::call(fn () => TrashController::purgeExpired())
     ->everyMinute()
     ->name('purge-trash');
+
+// Agendas en abonnement (spec 6.9) : ceux dont la synchronisation est due (toutes les 30 minutes,
+// plus espacée après une erreur), quelques-uns par passage pour rester sous la limite de durée.
+Schedule::call(fn () => CalendarImporter::syncDue())
+    ->everyMinute()
+    ->name('sync-calendars');

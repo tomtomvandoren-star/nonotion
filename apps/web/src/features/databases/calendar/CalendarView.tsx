@@ -22,6 +22,7 @@ import {
   type DateProperty,
 } from './dates'
 import { MonthView } from './MonthView'
+import { MyCalendars } from './MyCalendars'
 import { type DragStart, useCalendarDrag } from './useCalendarDrag'
 import { WeekView } from './WeekView'
 
@@ -81,6 +82,7 @@ function CalendarSetup({ database, view }: ViewBodyProps) {
 
 function Calendar({
   database,
+  view,
   rows,
   onOpenRow,
   inherited,
@@ -91,6 +93,7 @@ function Calendar({
   onCreate,
 }: CalendarProps & { property: DateProperty }) {
   const updateRow = useUpdateRow(database.id)
+  const updateConfig = useUpdateViewConfig(database.id)
   const createRow = useCreateRow(database.id)
   const completion = useCompletion(database)
   const drag = useCalendarDrag({
@@ -106,9 +109,16 @@ function Calendar({
     },
   })
 
+  // « Mes agendas » : les événements d'un agenda masqué ne s'affichent pas dans ce calendrier.
+  const hidden = new Set(view.config.hidden_sources ?? [])
+  const colors = new Map(database.sources.map((source) => [source.id, source.color]))
+  const colorOf = (item: CalendarItem) =>
+    item.row.calendar_source_id ? (colors.get(item.row.calendar_source_id) ?? null) : null
+
   const dated: CalendarItem[] = []
   const undated: DatabaseRowData[] = []
   for (const row of rows) {
+    if (row.calendar_source_id && hidden.has(row.calendar_source_id)) continue
     const preview = drag.preview?.rowId === row.id ? drag.preview.value : null
     const parsed = dateValueSchema.safeParse(row.properties[property.id])
     const value: DateValue | null = preview ?? (parsed.success ? parsed.data : null)
@@ -128,23 +138,40 @@ function Calendar({
     today,
     items: dated,
     completion,
+    colorOf,
     onOpen: open,
     onCreate,
     onDragStart: drag.start,
   }
 
   return (
+    // Une seule colonne de côté, à gauche (« Mes agendas » puis « Sans date ») : la grille garde
+    // sa largeur dans la colonne de la page. Sur téléphone, elle passe sous la grille.
     <div className="flex flex-col gap-3 md:flex-row md:items-start">
+      <div className="order-2 grid gap-3 md:order-none md:w-52 md:shrink-0">
+        {database.sources.length > 0 && (
+          <MyCalendars
+            database={database}
+            hidden={hidden}
+            onToggle={(sourceId, visible) => {
+              const next = new Set(hidden)
+              if (visible) next.delete(sourceId)
+              else next.add(sourceId)
+              updateConfig(view, { ...view.config, hidden_sources: [...next] })
+            }}
+          />
+        )}
+        <NoDatePanel
+          databaseId={database.id}
+          rows={undated}
+          values={() => inherited()}
+          onOpen={open}
+          onDragStart={drag.start}
+        />
+      </div>
       <div className="min-w-0 flex-1">
         {mode === 'week' ? <WeekView {...grid} creating={creating} /> : <MonthView {...grid} />}
       </div>
-      <NoDatePanel
-        databaseId={database.id}
-        rows={undated}
-        values={() => inherited()}
-        onOpen={open}
-        onDragStart={drag.start}
-      />
     </div>
   )
 }
@@ -169,7 +196,7 @@ function NoDatePanel({
   const [open, setOpen] = useState(true)
   const [draft, setDraft] = useState(false)
   return (
-    <aside aria-label="Sans date" className="text-sm md:w-56 md:shrink-0">
+    <aside aria-label="Sans date" className="text-sm">
       <button
         type="button"
         aria-expanded={open}

@@ -6,6 +6,7 @@ use App\Http\Requests\Pages\MovePageRequest;
 use App\Http\Requests\Pages\StorePageRequest;
 use App\Http\Requests\Pages\UpdatePageContentRequest;
 use App\Http\Requests\Pages\UpdatePageRequest;
+use App\Models\CalendarSource;
 use App\Models\Database;
 use App\Models\Page;
 use App\Models\Workspace;
@@ -85,6 +86,7 @@ class PageController extends Controller
 
         $database = null;
         $before = $page->properties ?? [];
+        self::guardImported($request, $page);
         if ($request->has('position') && $page->database_id === null) {
             throw ValidationException::withMessages(['position' => 'Pour ranger une page, déplacez-la dans l’arbre.']);
         }
@@ -216,6 +218,25 @@ class PageController extends Controller
         return response()->json(['status' => 'ok']);
     }
 
+    /**
+     * Un événement importé d'un agenda (spec 6.9) : son titre et les propriétés que l'agenda remplit
+     * (date, lieu, lien) se modifient dans l'agenda d'origine ; une resynchronisation les écraserait.
+     */
+    private static function guardImported(UpdatePageRequest $request, Page $page): void
+    {
+        if ($page->calendar_source_id === null) {
+            return;
+        }
+        $locked = array_values(CalendarSource::query()->find($page->calendar_source_id)?->property_map ?? []);
+        $touched = array_intersect($locked, array_map('strval', array_keys($request->input('properties', []))));
+        $renamed = $request->has('title') && (string) $request->input('title') !== $page->title;
+        if ($renamed || $touched !== []) {
+            throw ValidationException::withMessages([
+                $renamed ? 'title' : 'properties' => 'Cet événement vient d’un agenda importé : modifiez-le dans l’agenda d’origine.',
+            ]);
+        }
+    }
+
     private function findParent(string $workspaceId, string $parentId): Page
     {
         $parent = Page::query()
@@ -253,6 +274,7 @@ class PageController extends Controller
             'workspace_id' => $page->workspace_id,
             'database_id' => $page->database_id,
             'properties' => $page->database_id === null ? null : (object) ($page->properties ?? []),
+            'calendar_source_id' => $page->calendar_source_id,
             'cover_url' => $page->cover_url,
             'content' => $page->content,
             'version' => $page->version,

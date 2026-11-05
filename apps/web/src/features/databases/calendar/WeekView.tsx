@@ -36,6 +36,7 @@ export function WeekView({
   today,
   items,
   completion,
+  colorOf,
   onOpen,
   onCreate,
   onDragStart,
@@ -66,24 +67,25 @@ export function WeekView({
             key={day}
             data-day={day}
             aria-label={dayLabel(day)}
-            className="group/day flex items-center justify-between border-b border-l border-border px-1 py-1"
+            className="group/day relative flex flex-col items-center border-b border-l border-border py-1"
           >
-            <span className="flex items-baseline gap-1 text-xs text-muted-foreground">
+            {/* Le nom du jour au-dessus de son numéro : la colonne reste lisible même étroite. */}
+            <span className="text-[10px] leading-3 text-muted-foreground">
               {dayName.format(parseDay(day))}
-              <span
-                className={cn(
-                  'flex size-6 items-center justify-center rounded-full text-sm text-foreground tabular-nums',
-                  day === today && 'bg-primary font-semibold text-primary-foreground',
-                )}
-              >
-                {Number(day.slice(8))}
-              </span>
+            </span>
+            <span
+              className={cn(
+                'flex size-6 items-center justify-center rounded-full text-sm tabular-nums',
+                day === today && 'bg-primary font-semibold text-primary-foreground',
+              )}
+            >
+              {Number(day.slice(8))}
             </span>
             <button
               type="button"
               aria-label={`Nouveau le ${dayLabel(day)}`}
               onClick={() => onCreate(day)}
-              className="flex size-6 items-center justify-center rounded-sm text-muted-foreground opacity-0 transition-opacity group-hover/day:opacity-100 hover:bg-accent focus-visible:opacity-100 touch:opacity-60"
+              className="absolute top-0.5 right-0.5 flex size-5 items-center justify-center rounded-sm bg-background text-muted-foreground opacity-0 transition-opacity group-hover/day:opacity-100 hover:bg-accent focus-visible:opacity-100 touch:opacity-60"
             >
               <Plus aria-hidden className="size-4" />
             </button>
@@ -115,8 +117,9 @@ export function WeekView({
               completion={completion}
               continuesBefore={segment.continuesBefore}
               continuesAfter={segment.continuesAfter}
+              color={colorOf(segment.item)}
               onOpen={() => onOpen(segment.item.row.id)}
-              onDragStart={onDragStart}
+              onDragStart={colorOf(segment.item) ? undefined : onDragStart}
               className="pointer-events-auto mx-px"
               style={{
                 gridColumn: `${segment.startCol + 1} / ${segment.endCol + 2}`,
@@ -149,6 +152,7 @@ export function WeekView({
               items={items.filter((item) => onGrid(item) && overlaps(item, day, day))}
               creating={creating && dayOf(creating.start) === day ? creating : null}
               completion={completion}
+              colorOf={colorOf}
               onOpen={onOpen}
               onDragStart={onDragStart}
             />
@@ -166,9 +170,10 @@ function DayColumn({
   items,
   creating,
   completion,
+  colorOf,
   onOpen,
   onDragStart,
-}: Pick<GridProps, 'completion' | 'onOpen' | 'onDragStart'> & {
+}: Pick<GridProps, 'completion' | 'colorOf' | 'onOpen' | 'onDragStart'> & {
   day: string
   isToday: boolean
   now: Date
@@ -206,53 +211,68 @@ function DayColumn({
         backgroundImage: `repeating-linear-gradient(to bottom, transparent 0 ${HOUR_HEIGHT - 1}px, var(--border) ${HOUR_HEIGHT - 1}px ${HOUR_HEIGHT}px)`,
       }}
     >
-      {events.map(({ item, top, bottom, col, cols }) => (
-        <div
-          key={item.row.id}
-          data-done={completion?.isDone(item.row) || undefined}
-          className="group/event absolute px-px"
-          style={{
-            top: top * PX_PER_MINUTE,
-            height: (bottom - top) * PX_PER_MINUTE,
-            left: `${(col / cols) * 100}%`,
-            width: `${100 / cols}%`,
-          }}
-        >
-          <button
-            type="button"
-            data-calendar-item={item.row.id}
-            data-day-start={item.startDay}
-            aria-label={`${displayTitle(item.row.title)}, ${timeOf(item.start!)}`}
-            onClick={() => onOpen(item.row.id)}
-            onPointerDown={(event) =>
-              onDragStart(event, {
-                kind: 'move',
-                rowId: item.row.id,
-                value: item.value,
-                grabMinutes:
-                  (event.clientY - event.currentTarget.getBoundingClientRect().top) / PX_PER_MINUTE,
-              })
-            }
-            className="flex size-full flex-col overflow-hidden rounded-sm border-l-2 border-primary bg-primary/15 px-1 text-left text-xs select-none [-webkit-touch-callout:none] hover:bg-primary/25"
+      {events.map(({ item, top, bottom, col, cols }) => {
+        const color = colorOf(item)
+        return (
+          <div
+            key={item.row.id}
+            data-done={completion?.isDone(item.row) || undefined}
+            className="group/event absolute px-px"
+            style={{
+              top: top * PX_PER_MINUTE,
+              height: (bottom - top) * PX_PER_MINUTE,
+              left: `${(col / cols) * 100}%`,
+              width: `${100 / cols}%`,
+            }}
           >
-            <span className="nn-task-title truncate font-medium">
-              {displayTitle(item.row.title)}
-            </span>
-            <span className="truncate text-muted-foreground tabular-nums">
-              {timeOf(item.start!)}
-              {item.end && item.end > item.start! && ` – ${timeOf(item.end)}`}
-            </span>
-          </button>
-          {/* Tirer le bord du bas change la fin (spec 6.8). */}
-          <span
-            aria-hidden
-            onPointerDown={(event) =>
-              onDragStart(event, { kind: 'resize', rowId: item.row.id, value: item.value })
-            }
-            className="absolute inset-x-1 bottom-0 h-1.5 cursor-ns-resize rounded-b-sm group-hover/event:bg-primary/40"
-          />
-        </div>
-      ))}
+            <button
+              type="button"
+              data-calendar-item={item.row.id}
+              data-day-start={item.startDay}
+              aria-label={`${displayTitle(item.row.title)}, ${timeOf(item.start!)}`}
+              data-color={color ?? undefined}
+              onClick={() => onOpen(item.row.id)}
+              onPointerDown={(event) =>
+                // Un événement importé garde ses heures : elles viennent de l'agenda d'origine.
+                color
+                  ? undefined
+                  : onDragStart(event, {
+                      kind: 'move',
+                      rowId: item.row.id,
+                      value: item.value,
+                      grabMinutes:
+                        (event.clientY - event.currentTarget.getBoundingClientRect().top) /
+                        PX_PER_MINUTE,
+                    })
+              }
+              className={cn(
+                'flex size-full flex-col overflow-hidden rounded-sm border-l-2 px-1 text-left text-xs select-none [-webkit-touch-callout:none]',
+                color
+                  ? 'nn-tint border-current hover:brightness-95'
+                  : 'border-primary bg-primary/15 hover:bg-primary/25',
+              )}
+            >
+              <span className="nn-task-title truncate font-medium">
+                {displayTitle(item.row.title)}
+              </span>
+              <span className="truncate text-muted-foreground tabular-nums">
+                {timeOf(item.start!)}
+                {item.end && item.end > item.start! && ` – ${timeOf(item.end)}`}
+              </span>
+            </button>
+            {/* Tirer le bord du bas change la fin (spec 6.8). */}
+            {!color && (
+              <span
+                aria-hidden
+                onPointerDown={(event) =>
+                  onDragStart(event, { kind: 'resize', rowId: item.row.id, value: item.value })
+                }
+                className="absolute inset-x-1 bottom-0 h-1.5 cursor-ns-resize rounded-b-sm group-hover/event:bg-primary/40"
+              />
+            )}
+          </div>
+        )
+      })}
       {creating && (
         <div
           aria-hidden

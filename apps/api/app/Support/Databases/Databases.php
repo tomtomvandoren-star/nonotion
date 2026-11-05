@@ -2,6 +2,8 @@
 
 namespace App\Support\Databases;
 
+use App\Http\Controllers\CalendarSourceController;
+use App\Models\CalendarSource;
 use App\Models\Database;
 use App\Models\Page;
 use App\Models\View;
@@ -30,19 +32,23 @@ class Databases
 
     /**
      * Une nouvelle base : la propriété Titre, une vue Tableau et trois lignes vides (spec 6.4), ou
-     * le modèle demandé (« tasks » : le Gestionnaire de tâches, spec 6.7).
+     * le modèle demandé (« tasks » : le Gestionnaire de tâches, spec 6.7 ; « events » : une base
+     * d'événements pour un agenda importé, spec 6.9).
      * En pleine page, elle vit dans une nouvelle sous-page de $host, dont elle est tout le contenu.
      *
      * @return array{0: Database, 1: Page} la base et la page qui la contient
      */
     public static function create(Page $host, bool $fullPage, ?string $title, ?string $template = null): array
     {
-        $tasks = $template === TaskTemplate::NAME;
-        $title ??= $tasks ? 'Tâches' : null;
-        $schema = $tasks ? TaskTemplate::schema() : PropertySchema::initial();
-        $views = $tasks ? TaskTemplate::views($schema) : [['name' => 'Tableau', 'type' => 'table', 'config' => []]];
+        [$schema, $views, $emptyRows] = match ($template) {
+            TaskTemplate::NAME => [$schema = TaskTemplate::schema(), TaskTemplate::views($schema), 3],
+            // Une base d'événements démarre vide : les événements arrivent avec l'import.
+            EventTemplate::NAME => [$schema = EventTemplate::schema(), EventTemplate::views($schema), 0],
+            default => [PropertySchema::initial(), [['name' => 'Tableau', 'type' => 'table', 'config' => []]], 3],
+        };
+        $title ??= $template === TaskTemplate::NAME ? 'Tâches' : null;
 
-        return DB::transaction(function () use ($host, $fullPage, $title, $schema, $views) {
+        return DB::transaction(function () use ($host, $fullPage, $title, $schema, $views, $emptyRows) {
             $container = $host;
             if ($fullPage) {
                 $container = Page::create([
@@ -67,7 +73,7 @@ class Databases
             }
 
             $position = null;
-            for ($i = 0; $i < 3; $i++) {
+            for ($i = 0; $i < $emptyRows; $i++) {
                 $position = FractionalIndex::between($position, null);
                 self::createRow($database, ['position' => $position]);
             }
@@ -114,6 +120,23 @@ class Databases
         }
 
         return $values;
+    }
+
+    /**
+     * Ajoute une propriété au schéma ; les vues qui listent leurs colonnes l'affichent aussi.
+     *
+     * @param  array<string, mixed>  $property
+     */
+    public static function appendProperty(Database $database, array $property): void
+    {
+        $database->update(['schema' => [...$database->schema, $property]]);
+        foreach (View::query()->where('database_id', $database->id)->get() as $view) {
+            if (isset($view->config['visible_properties'])) {
+                $config = $view->config;
+                $config['visible_properties'][] = $property['id'];
+                $view->update(['config' => $config]);
+            }
+        }
     }
 
     public static function positionAtEnd(Database $database): string
@@ -163,6 +186,8 @@ class Databases
             'schema' => $database->schema,
             'views' => $database->views()->get()->map(fn (View $view) => self::view($view))->all(),
             'rows' => $database->rows()->get()->map(fn (Page $row) => self::row($row))->all(),
+            'sources' => CalendarSource::query()->where('database_id', $database->id)->orderBy('created_at')->get()
+                ->map(fn (CalendarSource $source) => CalendarSourceController::present($source))->all(),
         ];
     }
 
@@ -188,6 +213,8 @@ class Databases
             'icon' => $row->icon,
             'properties' => (object) ($row->properties ?? []),
             'position' => $row->position,
+            // Un événement importé d'un agenda (spec 6.9) : titre et date en lecture seule.
+            'calendar_source_id' => $row->calendar_source_id,
             'created_at' => $row->created_at?->toIso8601String(),
             'updated_at' => $row->updated_at?->toIso8601String(),
         ];
