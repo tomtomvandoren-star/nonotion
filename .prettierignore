@@ -2,6 +2,8 @@ pnpm-lock.yaml
 apps/api/
 dist/
 dist-sandbox/
+dist-desktop/
+apps/desktop/src-tauri/gen/
 apps/desktop/src-tauri/target/
 apps/desktop/src-tauri/icons/
 test-results/

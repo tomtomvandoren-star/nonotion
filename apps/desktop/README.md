@@ -8,12 +8,12 @@ avec l'adresse complète de l'API (`apps/web/.env.desktop`), parle au même serv
 Tout passe par la couche `apps/web/src/platform/` (spec 1.6.2) : `tauri.ts` est le seul fichier à
 importer `@tauri-apps/*`, et n'est chargé que dans l'application.
 
-| Quoi | Comment |
-|---|---|
+| Quoi               | Comment                                                                                                                                                                                              |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Jeton de connexion | Trousseau du système (crate `keyring`) : Trousseau d'accès de macOS, Gestionnaire d'identification de Windows, Secret Service sous Linux. Sans trousseau, le stockage de la vue web prend le relais. |
-| Liens externes | Navigateur du système (`tauri-plugin-opener`), y compris `webcal:` pour le Calendrier Apple. Un lien ne remplace jamais l'application dans sa fenêtre. |
-| Mises à jour | `tauri-plugin-updater` : l'application propose la nouvelle version, enregistre ce qui attend, installe et redémarre. Paquets signés (clé minisign), vérifiés avant installation. |
-| Fenêtre | Taille et position retenues (`tauri-plugin-window-state`). Glisser-déposer laissé à la page (blocs de l'éditeur, images). |
+| Liens externes     | Navigateur du système (`tauri-plugin-opener`), y compris `webcal:` pour le Calendrier Apple. Un lien ne remplace jamais l'application dans sa fenêtre.                                               |
+| Mises à jour       | `tauri-plugin-updater` : l'application propose la nouvelle version, enregistre ce qui attend, installe et redémarre. Paquets signés (clé minisign), vérifiés avant installation.                     |
+| Fenêtre            | Taille et position retenues (`tauri-plugin-window-state`). Glisser-déposer laissé à la page (blocs de l'éditeur, images).                                                                            |
 
 Le serveur admet les origines des vues web Tauri (`config/cors.php`) : `tauri://localhost` (macOS,
 Linux) et `http://tauri.localhost` (Windows).
@@ -25,11 +25,11 @@ construit sur chaque système, **installe** comme le ferait un utilisateur, puis
 l'application installée avec `NONOTION_SMOKE_TEST=1` : elle attend l'écran de connexion, note si
 le trousseau et l'API répondent, et se ferme (code 0 si tout va bien).
 
-| Système | Fichiers |
-|---|---|
+| Système | Fichiers                                                            |
+| ------- | ------------------------------------------------------------------- |
 | Windows | `Nonotion_x.y.z_x64-setup.exe` (sans droits administrateur), `.msi` |
-| macOS | `Nonotion_x.y.z_universal.dmg` (Intel et Apple Silicon) |
-| Linux | `.AppImage`, `.deb` |
+| macOS   | `Nonotion_x.y.z_universal.dmg` (Intel et Apple Silicon)             |
+| Linux   | `.AppImage`, `.deb`                                                 |
 
 ## Publier une version
 

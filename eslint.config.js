@@ -10,7 +10,9 @@ export default defineConfig(
     ignores: [
       '**/dist/**',
       '**/dist-sandbox/**',
+      '**/dist-desktop/**',
       'apps/desktop/src-tauri/target/**',
+      'apps/desktop/src-tauri/gen/**',
       'apps/api/**',
       'test-results/**',
       'playwright-report/**',
