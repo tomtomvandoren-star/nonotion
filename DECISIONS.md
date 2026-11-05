@@ -96,3 +96,27 @@ Une ligne par décision : la décision, puis sa raison (spec, section 0, règle 
 - **Annuler et Rétablir sont des boutons de la barre collée au-dessus du clavier, sur téléphone.** Il n'y a pas de Ctrl+Z sur un téléphone (spec 6.14 : chaque action a un équivalent tactile).
 - **La poignée et le « + » sont centrés sur la première ligne réelle du bloc, mesurée à l'affichage.** BlockNote les décalait d'une valeur fixe calculée pour ses propres tailles de titre (48 px pour un titre 1), trop bas pour les nôtres.
 - **Sur téléphone (moins de 768 px), la marge gauche fait 40 px et ne loge que la poignée ⠿.** Avec la marge de 16 px, la poignée sortait de l'écran ; le « + » est retiré là, Entrée et « / » suffisent pour insérer un bloc.
+
+## Phase 3
+
+- **Une ligne de base est une page dont `database_id` est rempli, rangée sous la page qui contient la base.** Elle part à la corbeille, revient et se déplace avec sa page sans code à part ; l'arbre de la barre latérale ne la montre pas. Une ligne supprimée seule figure dans la corbeille et revient dans sa base.
+- **Le Titre est une propriété du schéma (identifiant `title`), dont la valeur est le titre de la page.** On peut le renommer (« Nom », « Tâche »…) mais pas le masquer, le supprimer ni changer son type : c'est lui qui ouvre la ligne.
+- **Les identifiants des propriétés et des options sont courts et créés par le client ; le serveur les vérifie.** Une option créée en tapant dans une cellule s'affiche tout de suite, sans attendre un aller-retour pour son identifiant.
+- **Valeurs validées à l'identique par le front (Zod) et l'API (PHP), sur un même fichier d'exemples (`packages/shared/fixtures/property-values.json`).** La « règle d'or » de la spec 4.3 : une valeur invalide est refusée par l'API, pas seulement par l'interface.
+- **Dates : « AAAA-MM-JJ » pour une journée entière, un instant ISO 8601 en UTC quand l'heure compte ; une fin facultative du même genre.** Affichage dans le fuseau de l'appareil ; le fuseau d'origine (événements importés) viendra avec le calendrier et l'ICS (phases 5 et 6).
+- **Changer le type d'une propriété convertit les valeurs qui ont un sens (« 12,5 » devient 12,5) ; un texte qui devient une sélection donne ses options.** Comme Notion, plutôt que d'effacer les valeurs.
+- **Toute la base (schéma, vues, lignes) arrive en une requête ; filtres, tris et regroupement sont calculés dans le navigateur.** Le MVP de la spec 6.6. La pagination et la virtualisation des longs tableaux (spec 8, plus de 200 lignes) viendront quand une base le demandera.
+- **Vues proposées : Tableau, Liste et Galerie.** Le Board et le Calendrier arrivent avec leurs phases (4 et 5) ; le menu « + » ne montre que ce qui marche.
+- **« Nouveau » sans sa flèche ▾ des modèles pour l'instant.** Il n'y a pas encore de modèles de lignes ; un menu vide irait contre P8.
+- **« Nouveau » crée l'élément en tête et l'ouvre aussitôt, le curseur dans son titre ; la ligne « + Nouveau » du bas crée l'élément quand on valide son titre (Entrée) et rouvre une ligne vide.** Saisie en rafale sans perte de lettres (le champ reste le même pendant la réponse du serveur), et pas de ligne vide créée par un clic distrait.
+- **Un élément créé dans une vue filtrée ou depuis une section hérite des valeurs que la vue fixe (Statut = En cours…).** « Le + hérite du contexte où il se trouve » (spec 6.6) ; un filtre OU à plusieurs règles ne fixe rien.
+- **Une règle de filtre sans valeur ne filtre rien, et « Statut n'est pas Terminé » garde les lignes sans statut.** Ajouter un filtre ne vide pas la vue avant qu'on l'ait rempli ; une tâche pas encore classée n'est pas terminée.
+- **Ordre, visibilité et largeur des colonnes appartiennent à chaque vue (`visible_properties`, `property_widths`).** Une vue est une configuration (P6) ; une propriété ajoutée apparaît dans toutes les vues.
+- **La configuration d'une vue s'applique tout de suite à l'écran et part au serveur 400 ms après le dernier changement.** Glisser une largeur de colonne envoie une requête, pas une par pixel ; une réponse du serveur arrivée entre-temps ne l'écrase pas.
+- **Les colonnes se déplacent à la souris ou par appui long au doigt ; les tris se réordonnent par flèches haut et bas.** L'équivalent clavier pour déplacer une colonne reste à faire.
+- **Ligne ouverte en aperçu à droite par défaut ; au centre ou en pleine page selon l'option de la vue.** Spec 6.4, `open_pages_in`.
+- **Le bloc « base de données » n'est pas sélectionnable comme du texte.** Taper dans une cellule ou glisser une colonne appartient à la base, jamais à l'éditeur de la page.
+- **Supprimer le bloc d'une base ne supprime pas ses données.** Elles restent en base, sans plus être affichées ; une vraie suppression (avec corbeille) des bases viendra plus tard.
+- **Les options se créent en tapant dans une cellule ; les renommer, les recolorer ou les supprimer viendra avec la gestion des options.** Le serveur sait déjà vider les valeurs d'une option supprimée.
+- **Les requêtes des bases et des valeurs de lignes échappent à `TrimStrings` et `ConvertEmptyStringsToNull`.** Une cellule de texte vidée vaut « » et non null, et ses espaces restent.
+- **Les vues portent aussi le `workspace_id` de leur base.** La même portée d'isolation s'applique aux pages, aux bases et aux vues, sans jointure.

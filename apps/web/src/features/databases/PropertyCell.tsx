@@ -1,9 +1,11 @@
 import type { DatabaseDetail, DateValue, Property, PropertyOption } from '@nonotion/shared'
+import { useQueryClient } from '@tanstack/react-query'
+import { useRef } from 'react'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 import { DateEditor, type EditEnd, NumberEditor, OptionPicker, TextEditor } from './editors'
 import { PropertyValueView } from './propertyDisplay'
-import { usePropertyMutation } from './queries'
+import { databaseKey, usePropertyMutation } from './queries'
 import { isOptionProperty } from './values'
 
 /**
@@ -33,6 +35,8 @@ export function PropertyCell({
   className?: string
 }) {
   const properties = usePropertyMutation(database.id)
+  const queryClient = useQueryClient()
+  const creating = useRef<Promise<void>>(Promise.resolve())
   const label = property.name
 
   if (property.type === 'checkbox') {
@@ -120,11 +124,22 @@ export function PropertyCell({
               value={value}
               onChange={onChange}
               onDone={onEndEdit}
-              onCreateOption={async (option: PropertyOption) => {
-                await properties.mutateAsync({
-                  kind: 'update',
-                  property: { ...property, options: [...property.options, option] } as Property,
+              onCreateOption={(option: PropertyOption) => {
+                // Une création après l'autre, chacune à partir des options à jour : deux options
+                // tapées vite ne s'effacent pas l'une l'autre.
+                const run = creating.current.then(async () => {
+                  const current =
+                    queryClient
+                      .getQueryData<DatabaseDetail>(databaseKey(database.id))
+                      ?.schema.find((item) => item.id === property.id) ?? property
+                  const options = 'options' in current ? current.options : []
+                  await properties.mutateAsync({
+                    kind: 'update',
+                    property: { ...current, options: [...options, option] } as Property,
+                  })
                 })
+                creating.current = run.catch(() => {})
+                return run
               }}
             />
           ) : null}

@@ -9,7 +9,7 @@ import {
   type StatusGroup,
 } from '@nonotion/shared'
 import { Check, X } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { OptionPill } from './propertyDisplay'
 import { parseNumber } from './values'
@@ -306,6 +306,11 @@ export function OptionPicker({
   )
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
+  // La valeur à jour, lue après la création d'une option (le temps que le serveur réponde).
+  const latest = useRef(selected)
+  useEffect(() => {
+    latest.current = selected
+  }, [selected])
 
   const items = useMemo<PickerItem[]>(() => {
     const q = normalize(query)
@@ -318,6 +323,9 @@ export function OptionPicker({
   }, [property.options, query])
 
   const choose = async (item: PickerItem) => {
+    // Le champ se vide tout de suite : la suite de la frappe est une nouvelle recherche.
+    setQuery('')
+    setActive(0)
     let id: string
     if (item.kind === 'create') {
       const used = new Set(property.options.map((option) => option.color))
@@ -335,11 +343,11 @@ export function OptionPicker({
     } else {
       id = item.option.id
     }
-    setQuery('')
+    const current = latest.current
     if (multi) {
-      onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id])
+      onChange(current.includes(id) ? current.filter((x) => x !== id) : [...current, id])
     } else {
-      onChange(selected[0] === id ? null : id)
+      onChange(current[0] === id ? null : id)
       onDone('commit')
     }
   }
@@ -368,6 +376,8 @@ export function OptionPicker({
           aria-selected={isSelected}
           data-active={index === active || undefined}
           onMouseEnter={() => setActive(index)}
+          // choose() lit la référence après un await, dans le gestionnaire du clic, pas au rendu.
+          // eslint-disable-next-line react-hooks/refs
           onClick={() => void choose(item)}
           className="flex h-8 w-full items-center gap-2 rounded-sm px-2 text-left text-sm data-active:bg-accent"
         >

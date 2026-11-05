@@ -27,6 +27,9 @@ import {
 
 export const databaseKey = (databaseId: string) => ['database', databaseId] as const
 
+/** Configurations de vues modifiées ici et pas encore envoyées (voir useUpdateViewConfig). */
+const pendingConfigs = new Map<string, ReturnType<typeof setTimeout>>()
+
 /** Même rythme que l'arbre : rafraîchissement à la place du temps réel (spec 1.3.6). */
 const SYNC_INTERVAL_MS = 60_000
 
@@ -36,6 +39,8 @@ export function useDatabase(databaseId: string) {
     queryFn: () => fetchDatabase(databaseId),
     enabled: databaseId !== '',
     refetchInterval: SYNC_INTERVAL_MS,
+    // Ouvrir une ligne (aperçu) ne recharge pas la base : la réponse écraserait une saisie en cours.
+    staleTime: 30_000,
   })
 }
 
@@ -136,16 +141,38 @@ export function usePropertyMutation(databaseId: string) {
           ? updateProperty(databaseId, change.property)
           : deleteProperty(databaseId, change.propertyId),
     onMutate: async (change) => {
-      if (change.kind !== 'update') return { undo: () => {} }
+      if (change.kind !== 'update') return { undo: () => {}, keepRows: change.kind === 'add' }
       await queryClient.cancelQueries({ queryKey: databaseKey(databaseId) })
+      const before = queryClient
+        .getQueryData<DatabaseDetail>(databaseKey(databaseId))
+        ?.schema.find((p) => p.id === change.property.id)
+      const ids = (p: Property | undefined) =>
+        p && 'options' in p ? p.options.map((option) => option.id) : []
+      // Renommer, ajouter une option : les valeurs des lignes ne changent pas côté serveur.
+      const keepRows =
+        before?.type === change.property.type &&
+        ids(before).every((id) => ids(change.property).includes(id))
       return {
+        keepRows,
         undo: patchDatabase(queryClient, databaseId, (database) => ({
           ...database,
           schema: database.schema.map((p) => (p.id === change.property.id ? change.property : p)),
         })),
       }
     },
-    onSuccess: (database) => queryClient.setQueryData(databaseKey(databaseId), database),
+    // Le serveur renvoie la base entière. Une configuration de vue pas encore envoyée reste la nôtre,
+    // et les lignes aussi quand la modification ne les touche pas : une valeur saisie entre-temps
+    // (encore en route vers le serveur) ne doit pas disparaître.
+    onSuccess: (database, _change, context) =>
+      queryClient.setQueryData<DatabaseDetail>(databaseKey(databaseId), (current) => ({
+        ...database,
+        rows: context?.keepRows && current ? current.rows : database.rows,
+        views: database.views.map((view) =>
+          pendingConfigs.has(view.id)
+            ? (current?.views.find((v) => v.id === view.id) ?? view)
+            : view,
+        ),
+      })),
     onError: (_error, _change, context) => {
       context?.undo()
       toast.error('La propriété n’a pas pu être enregistrée.')
@@ -176,8 +203,6 @@ function replaceView(queryClient: QueryClient, databaseId: string, view: Databas
       : [...database.views, view],
   }))
 }
-
-const pendingConfigs = new Map<string, ReturnType<typeof setTimeout>>()
 
 /**
  * Configuration d'une vue (filtres, tris, colonnes…) : appliquée tout de suite à l'écran, envoyée au

@@ -206,7 +206,16 @@ function PageTitle({
   const updatePage = useUpdatePage()
   const [value, setValue] = useState(page.title)
   const save = useDebouncedSave((title: string) =>
-    updatePage.mutate({ pageId: page.id, patch: { title } }),
+    updatePage.mutate(
+      { pageId: page.id, patch: { title } },
+      {
+        // La base a pu être rechargée entre-temps avec l'ancien titre : on y reporte le nouveau.
+        onSuccess: () => {
+          if (page.database_id)
+            applyRowPatchLocally(queryClient, page.database_id, page.id, { title })
+        },
+      },
+    ),
   )
   useAutoHeight(ref, value)
 
