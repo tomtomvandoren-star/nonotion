@@ -34,8 +34,7 @@ const VIEW_ICONS: Record<ViewType, LucideIcon> = {
   gallery: LayoutGrid,
 }
 
-/** Les types de vues disponibles ; le Calendrier arrive avec sa phase (5). */
-const AVAILABLE_VIEW_TYPES: ViewType[] = ['table', 'board', 'list', 'gallery']
+const AVAILABLE_VIEW_TYPES: ViewType[] = ['table', 'board', 'list', 'calendar', 'gallery']
 
 /**
  * Onglets des vues (spec 6.5), au-dessus de la base : cliquer change de vue, double-cliquer renomme,

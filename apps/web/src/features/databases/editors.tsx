@@ -15,8 +15,9 @@ import {
 import { Check, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
+import { DEVICE_TIME_ZONE } from './calendar/dates'
 import { OptionPill } from './propertyDisplay'
-import { parseNumber } from './values'
+import { originalTime, parseNumber, zoneName } from './values'
 
 /** Comment l'édition se termine : valider, annuler, ou passer à la cellule voisine (Tab). */
 export type EditEnd = 'commit' | 'cancel' | 'next' | 'prev'
@@ -169,7 +170,13 @@ export function DateEditor({
     )
       endValue = startValue
     const repeat = next.repeat === undefined ? value?.repeat : next.repeat
-    return { start: startValue, end: endValue, ...(repeat ? { repeat } : {}) }
+    // Une heure saisie ici l'est dans le fuseau de l'appareil : c'est son fuseau d'origine.
+    return {
+      start: startValue,
+      end: endValue,
+      ...(repeat ? { repeat } : {}),
+      ...(time ? { time_zone: DEVICE_TIME_ZONE } : {}),
+    }
   }
 
   const fieldClass =
@@ -251,6 +258,14 @@ export function DateEditor({
         />
         Inclure l’heure
       </label>
+      {withTime && value && (
+        <p className="text-xs text-muted-foreground">
+          Heure de {zoneName(DEVICE_TIME_ZONE)}
+          {value.time_zone && value.time_zone !== DEVICE_TIME_ZONE && (
+            <> ; saisie à l’origine {originalTime(value)}</>
+          )}
+        </p>
+      )}
       <RepeatField
         value={value?.repeat ?? null}
         disabled={!value}

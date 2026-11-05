@@ -44,6 +44,7 @@ class ViewConfigRules
             "{$prefix}.property_widths" => ['sometimes', 'array', self::idKeys()],
             "{$prefix}.property_widths.*" => ['integer', 'min:60', 'max:1000'],
             "{$prefix}.calendar_by" => ['sometimes', 'nullable', 'string', $id],
+            "{$prefix}.calendar_mode" => ['sometimes', 'in:month,week'],
             "{$prefix}.open_pages_in" => ['sometimes', 'in:side_peek,center_modal,full_page'],
             "{$prefix}.card_size" => ['sometimes', 'in:small,medium,large'],
         ];

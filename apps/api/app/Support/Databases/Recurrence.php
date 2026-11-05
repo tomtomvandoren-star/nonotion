@@ -61,22 +61,28 @@ class Recurrence
     public static function nextValue(array $value): array
     {
         ['unit' => $unit, 'interval' => $interval] = $value['repeat'];
-        $next = [...$value, 'start' => self::shift($value['start'], $unit, $interval)];
+        $zone = $value['time_zone'] ?? null;
+        $next = [...$value, 'start' => self::shift($value['start'], $unit, $interval, $zone)];
         if (isset($value['end'])) {
-            $next['end'] = self::shift($value['end'], $unit, $interval);
+            $next['end'] = self::shift($value['end'], $unit, $interval, $zone);
         }
 
         return $next;
     }
 
-    /** Décale une journée (« 2026-11-05 ») ou un instant ISO, dans le format reçu. */
-    public static function shift(string $value, string $unit, int $interval): string
+    /**
+     * Décale une journée (« 2026-11-05 ») ou un instant ISO, dans le format reçu. Avec son fuseau
+     * d'origine, une heure garde la même heure locale d'un jour à l'autre, changement d'heure compris.
+     */
+    public static function shift(string $value, string $unit, int $interval, ?string $zone = null): string
     {
         if (strlen($value) === 10) {
             return self::add(new DateTimeImmutable($value.'T00:00:00', new DateTimeZone('UTC')), $unit, $interval)->format('Y-m-d');
         }
 
-        $shifted = self::add(new DateTimeImmutable($value), $unit, $interval);
+        $date = new DateTimeImmutable($value);
+        $local = self::zone($zone);
+        $shifted = self::add($local === null ? $date : $date->setTimezone($local), $unit, $interval);
         if (str_ends_with($value, 'Z')) {
             $format = str_contains($value, '.') ? 'Y-m-d\TH:i:s.v\Z' : 'Y-m-d\TH:i:s\Z';
 
@@ -84,6 +90,16 @@ class Recurrence
         }
 
         return $shifted->format('Y-m-d\TH:i:sP');
+    }
+
+    /** Le fuseau nommé, s'il existe sur ce serveur. */
+    private static function zone(?string $name): ?DateTimeZone
+    {
+        try {
+            return $name === null ? null : new DateTimeZone($name);
+        } catch (\Exception) {
+            return null;
+        }
     }
 
     /** « Tous les mois » le 31 janvier tombe le 28 (ou 29) février, pas le 3 mars. */

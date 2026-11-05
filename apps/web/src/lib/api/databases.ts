@@ -48,7 +48,7 @@ export type RowPatch = { title?: string; properties?: Record<string, unknown>; p
  * Titre ou valeurs d'une ligne : seules les propriétés envoyées changent. `created` : la prochaine
  * occurrence d'une tâche récurrente qui vient d'être terminée (spec 6.7).
  */
-export const updateRow = (rowId: string, patch: RowPatch) =>
+export const updateRow = (rowId: string, patch: RowPatch, options?: { keepalive?: boolean }) =>
   apiRequest(
     'PATCH',
     `pages/${rowId}`,
@@ -57,6 +57,7 @@ export const updateRow = (rowId: string, patch: RowPatch) =>
       created: databaseRowSchema.optional(),
     }),
     patch,
+    options,
   )
 
 export const addProperty = (databaseId: string, property: Property) =>

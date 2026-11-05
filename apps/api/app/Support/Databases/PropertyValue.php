@@ -15,6 +15,9 @@ class PropertyValue
 
     private const INSTANT = '/^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d(:[0-5]\d(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/';
 
+    /** Fuseau d'origine d'une heure : un nom IANA (« Europe/Brussels »), comme TIME_ZONE_PATTERN côté front. */
+    public const TIME_ZONE = '/^[A-Za-z][A-Za-z0-9_+-]*(\/[A-Za-z0-9_+-]+){0,2}$/';
+
     /** @param array<string, mixed> $property */
     public static function isValid(array $property, mixed $value): bool
     {
@@ -183,10 +186,14 @@ class PropertyValue
      */
     private static function isValidDate(mixed $value): bool
     {
-        if (! is_array($value) || array_is_list($value) || ! isset($value['start']) || array_diff(array_keys($value), ['start', 'end', 'repeat']) !== []) {
+        if (! is_array($value) || array_is_list($value) || ! isset($value['start']) || array_diff(array_keys($value), ['start', 'end', 'repeat', 'time_zone']) !== []) {
             return false;
         }
         if (! self::isValidRepeat($value['repeat'] ?? null)) {
+            return false;
+        }
+        $zone = $value['time_zone'] ?? null;
+        if ($zone !== null && (! is_string($zone) || strlen($zone) > 64 || ! preg_match(self::TIME_ZONE, $zone))) {
             return false;
         }
         $start = $value['start'];

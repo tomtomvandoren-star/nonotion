@@ -11,6 +11,7 @@ import {
   Calendar,
   CircleChevronDown,
   CircleDashed,
+  Globe,
   Hash,
   type LucideIcon,
   Repeat,
@@ -19,7 +20,8 @@ import {
   Type,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { formatDate } from './values'
+import { DEVICE_TIME_ZONE } from './calendar/dates'
+import { formatDate, originalTime } from './values'
 
 const PROPERTY_ICONS: Record<PropertyType, LucideIcon> = {
   title: Type,
@@ -89,6 +91,16 @@ export function PropertyValueView({
           )}
         >
           {formatDate(date)}
+          {hasTime(date) && date.time_zone && date.time_zone !== DEVICE_TIME_ZONE && (
+            // Affichée dans le fuseau de l'appareil ; l'heure d'origine reste lisible (spec 6.8).
+            <Globe
+              role="img"
+              aria-label={`Saisie à l’origine ${originalTime(date)}`}
+              className="size-3 shrink-0 text-muted-foreground"
+            >
+              <title>{`Saisie à l’origine ${originalTime(date)}`}</title>
+            </Globe>
+          )}
           {date.repeat && (
             <Repeat
               role="img"

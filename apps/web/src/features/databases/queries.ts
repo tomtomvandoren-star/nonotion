@@ -63,9 +63,15 @@ function mergePendingConfig(
     pending.config = { ...pending.config, visible_properties: [...ours, ...added] }
   return pending.config
 }
-window.addEventListener('pagehide', flushPendingConfigs)
+
+// Quitter, recharger ou passer en arrière-plan : tout ce qui attend encore part tout de suite.
+const flushAll = () => {
+  flushPendingConfigs()
+  flushRowQueues()
+}
+window.addEventListener('pagehide', flushAll)
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') flushPendingConfigs()
+  if (document.visibilityState === 'hidden') flushAll()
 })
 
 /** Même rythme que l'arbre : rafraîchissement à la place du temps réel (spec 1.3.6). */
@@ -138,18 +144,98 @@ function nextOccurrenceMessage(
   return 'Prochaine occurrence créée.'
 }
 
+/** Les modifications de lignes encore en route, dans l'ordre où elles ont été faites. */
+const pendingRowPatches = new Map<string, RowPatch[]>()
+type RowUpdate = Awaited<ReturnType<typeof updateRow>>
+type Waiting = {
+  patch: RowPatch
+  resolve: (result: RowUpdate) => void
+  reject: (error: unknown) => void
+}
+/** Par ligne : une requête en route au plus, et les modifications qui attendent leur tour. */
+const rowQueues = new Map<string, { busy: boolean; waiting: Waiting[] }>()
+
+/** Plusieurs modifications d'une ligne en une : la plus récente l'emporte, champ par champ. */
+const mergePatches = (patches: RowPatch[]): RowPatch =>
+  patches.reduce<RowPatch>(
+    (merged, patch) => ({
+      ...merged,
+      ...patch,
+      ...(merged.properties || patch.properties
+        ? { properties: { ...merged.properties, ...patch.properties } }
+        : {}),
+    }),
+    {},
+  )
+
+/** Envoie ce qui attend (fusionné), et règle chaque modification avec la réponse. */
+function send(rowId: string, waiting: Waiting[]) {
+  return updateRow(rowId, mergePatches(waiting.map((item) => item.patch)), {
+    keepalive: true,
+  }).then(
+    // Une tâche récurrente créée par cet envoi n'est annoncée qu'une fois.
+    (result) =>
+      waiting.forEach((item, i) =>
+        item.resolve(i === waiting.length - 1 ? result : { ...result, created: undefined }),
+      ),
+    (error: unknown) => waiting.forEach((item) => item.reject(error)),
+  )
+}
+
+function sendNext(rowId: string) {
+  const queue = rowQueues.get(rowId)
+  if (!queue || queue.waiting.length === 0) {
+    rowQueues.delete(rowId)
+    return
+  }
+  queue.busy = true
+  void send(rowId, queue.waiting.splice(0)).finally(() => {
+    queue.busy = false
+    sendNext(rowId)
+  })
+}
+
+/**
+ * Les modifications d'une même ligne partent l'une après l'autre : trois changements rapides d'une
+ * date (jour, heure, minute) arrivent au serveur dans l'ordre, et c'est le dernier qui reste. Celles
+ * qui attendent partent ensemble au tour suivant. Les autres lignes n'attendent pas.
+ */
+function updateRowInOrder(rowId: string, patch: RowPatch): Promise<RowUpdate> {
+  return new Promise((resolve, reject) => {
+    const queue = rowQueues.get(rowId) ?? { busy: false, waiting: [] }
+    rowQueues.set(rowId, queue)
+    queue.waiting.push({ patch, resolve, reject })
+    if (!queue.busy) sendNext(rowId)
+  })
+}
+
+/** La page se ferme ou passe en arrière-plan : ce qui attend part tout de suite (keepalive). */
+function flushRowQueues() {
+  for (const [rowId, queue] of rowQueues)
+    if (queue.waiting.length > 0) void send(rowId, queue.waiting.splice(0))
+}
+
 /** Titre ou valeurs d'une ligne : affichés tout de suite partout (tableau, aperçu, autres vues). */
 export function useUpdateRow(databaseId: string) {
   const queryClient = useQueryClient()
+  /** Une réponse arrivée ne recouvre pas une saisie plus récente, encore en route. */
+  const reapplyNewer = (rowId: string, patch: RowPatch) => {
+    const pending = pendingRowPatches.get(rowId) ?? []
+    for (const newer of pending.slice(pending.indexOf(patch) + 1))
+      applyRowPatchLocally(queryClient, databaseId, rowId, newer)
+  }
   return useMutation({
     mutationKey: SAVE_MUTATION_KEY,
-    mutationFn: ({ rowId, patch }: { rowId: string; patch: RowPatch }) => updateRow(rowId, patch),
+    mutationFn: ({ rowId, patch }: { rowId: string; patch: RowPatch }) =>
+      updateRowInOrder(rowId, patch),
     onMutate: async ({ rowId, patch }) => {
+      pendingRowPatches.set(rowId, [...(pendingRowPatches.get(rowId) ?? []), patch])
       // Tout de suite (une case cochée ne revient pas en arrière le temps d'un aller-retour)…
       const undo = applyRowPatchLocally(queryClient, databaseId, rowId, patch)
       // … et encore après avoir annulé un rafraîchissement en cours, qui remet l'état d'avant.
       await queryClient.cancelQueries({ queryKey: databaseKey(databaseId) })
       applyRowPatchLocally(queryClient, databaseId, rowId, patch)
+      reapplyNewer(rowId, patch)
       return { undo }
     },
     // Un rafraîchissement a pu ramener l'ancienne valeur entre-temps : on reporte la nôtre.
@@ -164,10 +250,16 @@ export function useUpdateRow(databaseId: string) {
         }))
         toast.success(nextOccurrenceMessage(queryClient, databaseId, created))
       }
+      reapplyNewer(rowId, patch)
     },
     onError: (_error, _input, context) => {
       context?.undo()
       toast.error('La modification n’a pas pu être enregistrée.')
+    },
+    onSettled: (_data, _error, { rowId, patch }) => {
+      const rest = (pendingRowPatches.get(rowId) ?? []).filter((item) => item !== patch)
+      if (rest.length > 0) pendingRowPatches.set(rowId, rest)
+      else pendingRowPatches.delete(rowId)
     },
   })
 }

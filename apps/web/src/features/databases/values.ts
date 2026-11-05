@@ -21,6 +21,25 @@ const dayFormat = new Intl.DateTimeFormat('fr-FR', {
 })
 const timeFormat = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' })
 
+/** « New York » pour « America/New_York ». */
+export const zoneName = (zone: string) => (zone.split('/').at(-1) ?? zone).replaceAll('_', ' ')
+
+/** L'heure telle qu'elle a été saisie, dans son fuseau d'origine : « 08:30 à New York ». */
+export function originalTime(value: DateValue): string {
+  if (!value.time_zone || !value.start.includes('T')) return ''
+  try {
+    const time = new Intl.DateTimeFormat('fr-FR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: value.time_zone,
+    }).format(new Date(value.start))
+    return `${time} à ${zoneName(value.time_zone)}`
+  } catch {
+    // Un fuseau que ce navigateur ne connaît pas.
+    return zoneName(value.time_zone)
+  }
+}
+
 /** « 5 nov. 2026 », « 5 nov. 2026 14:30 », « 5 nov. 2026 → 7 nov. 2026 ». */
 export function formatDate(value: DateValue): string {
   const one = (text: string) => {

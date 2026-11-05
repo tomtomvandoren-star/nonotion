@@ -63,6 +63,8 @@ export function ViewToolbar({
   filterOpen,
   onFilterOpen,
   onNew,
+  leading,
+  newLabel = 'Nouveau',
 }: {
   database: DatabaseDetail
   view: DatabaseView
@@ -72,6 +74,9 @@ export function ViewToolbar({
   filterOpen: boolean
   onFilterOpen: (open: boolean) => void
   onNew: () => void
+  /** À gauche : les commandes propres à la vue (la période d'un calendrier). */
+  leading?: React.ReactNode
+  newLabel?: string
 }) {
   const config = view.config
   const byId = propertiesById(database.schema)
@@ -83,6 +88,7 @@ export function ViewToolbar({
 
   return (
     <div className="sticky top-0 z-10 flex flex-wrap items-center justify-end gap-0.5 bg-background py-1">
+      {leading}
       <Popover open={filterOpen} onOpenChange={onFilterOpen}>
         <PopoverTrigger asChild>
           {/* Un filtre actif colore le bouton et montre combien de règles : la vue est filtrée. */}
@@ -163,7 +169,7 @@ export function ViewToolbar({
         onClick={onNew}
         className="ml-1 flex h-7 items-center gap-1 rounded-sm bg-primary px-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
       >
-        <Plus aria-hidden className="size-4" /> Nouveau
+        <Plus aria-hidden className="size-4" /> {newLabel}
       </button>
     </div>
   )

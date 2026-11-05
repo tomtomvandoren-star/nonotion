@@ -1,0 +1,169 @@
+import { expect, test, type Locator, type Page } from '@playwright/test'
+import { createPage, editorOf, signUpAndOpen } from './helpers'
+
+/** Une base de tâches (modèle) ouverte sur sa vue Calendrier, par Échéance. */
+async function openCalendar(page: Page) {
+  await createPage(page, 'Agenda')
+  await page.getByLabel('Titre de la page').press('Enter')
+  await expect(editorOf(page)).toBeFocused()
+  await page.keyboard.type('/gestionnaire')
+  await expect(page.getByRole('option').first()).toContainText('Gestionnaire de tâches')
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('table', { name: 'Tâches' })).toBeVisible()
+  await page.getByRole('tab', { name: 'Calendrier' }).click()
+  await expect(page.getByRole('radio', { name: 'Mois' })).toHaveAttribute('aria-checked', 'true')
+}
+
+/** Aujourd'hui et un autre jour du même mois, au format « AAAA-MM-JJ » du navigateur. */
+const days = (page: Page) =>
+  page.evaluate(() => {
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+    const today = new Date()
+    // Un autre jour du mois affiché, à une semaine d'écart si possible.
+    const other = new Date(today)
+    other.setDate(today.getDate() + (today.getDate() > 20 ? -7 : 7))
+    const label = (d: Date) =>
+      new Intl.DateTimeFormat('fr-FR', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      }).format(d)
+    return {
+      today: iso(today),
+      other: iso(other),
+      todayLabel: label(today),
+      otherLabel: label(other),
+    }
+  })
+
+const item = (page: Page, title: string) =>
+  page.locator('[data-calendar-item]').filter({ hasText: title })
+const cell = (page: Page, label: string) =>
+  page.locator(`[data-day][aria-label="${label}"]`).first()
+
+/** Crée un élément par le « + » d'une case et lui donne un titre dans l'aperçu. */
+async function createOn(page: Page, label: string, title: string) {
+  await cell(page, label).hover()
+  await page.getByRole('button', { name: `Nouveau le ${label}` }).click()
+  const peek = page.getByRole('dialog', { name: 'Aperçu de la page' })
+  await expect(peek.getByLabel('Titre de la page')).toBeFocused()
+  await page.keyboard.type(title)
+  await peek.getByRole('button', { name: 'Fermer l’aperçu' }).click()
+  await expect(item(page, title)).toBeVisible()
+}
+
+async function dragTo(page: Page, source: Locator, target: Locator) {
+  const from = (await source.boundingBox())!
+  const to = (await target.boundingBox())!
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 12 })
+  await page.mouse.up()
+}
+
+test.describe('6.8 Vue Calendrier', () => {
+  test('créer au « + » d’une case, glisser sur un autre jour, la date reste après rechargement', async ({
+    page,
+    request,
+  }) => {
+    await signUpAndOpen(page, request)
+    await openCalendar(page)
+    const { today, other, todayLabel, otherLabel } = await days(page)
+
+    await createOn(page, todayLabel, 'Dentiste')
+    await expect(item(page, 'Dentiste')).toHaveAttribute('data-day-start', today)
+
+    await dragTo(page, item(page, 'Dentiste'), cell(page, otherLabel))
+    await expect(item(page, 'Dentiste')).toHaveAttribute('data-day-start', other)
+
+    await page.reload()
+    await page.getByRole('tab', { name: 'Calendrier' }).click()
+    await expect(item(page, 'Dentiste')).toHaveAttribute('data-day-start', other)
+  })
+
+  test('un élément sans date est dans « Sans date » ; glissé sur un jour, il est daté', async ({
+    page,
+    request,
+  }) => {
+    await signUpAndOpen(page, request)
+    await openCalendar(page)
+    const { today, todayLabel } = await days(page)
+
+    // Les trois tâches de départ n'ont pas d'échéance.
+    const panel = page.getByRole('complementary', { name: 'Sans date' })
+    await expect(panel.locator('[data-calendar-item]')).toHaveCount(3)
+    await panel.getByRole('button', { name: 'Nouveau' }).click()
+    await page.getByLabel('Titre du nouvel élément').fill('Un jour, peut-être')
+    await page.keyboard.press('Enter')
+    await page.keyboard.press('Escape')
+    await expect(panel.locator('[data-calendar-item]')).toHaveCount(4)
+
+    await dragTo(page, item(page, 'Un jour, peut-être'), cell(page, todayLabel))
+    await expect(panel.locator('[data-calendar-item]')).toHaveCount(3)
+    await expect(item(page, 'Un jour, peut-être')).toHaveAttribute('data-day-start', today)
+
+    // Replié, le panneau garde son compteur.
+    await panel.getByRole('button', { name: /Sans date/ }).click()
+    await expect(panel.locator('[data-calendar-item]')).toHaveCount(0)
+    await expect(panel.getByRole('button', { name: /Sans date/ })).toContainText('3')
+  })
+
+  test('basculer Mois | Semaine conserve la période', async ({ page, request }) => {
+    await signUpAndOpen(page, request)
+    await openCalendar(page)
+    const period = page.getByTestId('calendar-period')
+
+    await page.getByRole('button', { name: 'Mois suivant' }).click()
+    const month = (await period.textContent())!
+    await page.getByRole('radio', { name: 'Semaine' }).click()
+    await expect(page.getByRole('radio', { name: 'Semaine' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    )
+    // La semaine affichée est dans le mois qu'on regardait.
+    const monthName = month.split(' ')[0]!.toLowerCase()
+    const short = monthName.slice(0, 3)
+    await expect(period).toContainText(new RegExp(short, 'i'))
+
+    await page.getByRole('radio', { name: 'Mois' }).click()
+    await expect(period).toHaveText(month)
+
+    // Le choix Mois | Semaine est celui de la vue : il reste après rechargement.
+    await page.getByRole('radio', { name: 'Semaine' }).click()
+    await page.waitForTimeout(600)
+    await page.reload()
+    await page.getByRole('tab', { name: 'Calendrier' }).click()
+    await expect(page.getByRole('radio', { name: 'Semaine' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    )
+  })
+
+  test('vue semaine : cliquer-glisser sur la grille crée un événement avec ces horaires', async ({
+    page,
+    request,
+  }) => {
+    await signUpAndOpen(page, request)
+    await openCalendar(page)
+    const { todayLabel } = await days(page)
+    await page.getByRole('radio', { name: 'Semaine' }).click()
+
+    const column = page.locator(`[data-hours][aria-label="${todayLabel}"]`)
+    const box = (await column.boundingBox())!
+    // 10 h → 11 h 30 sur la grille (une heure = 48 px) ; la boîte de la colonne suit déjà le défilement.
+    const yAt = (minutes: number) => box.y + minutes * 0.8
+    await page.mouse.move(box.x + box.width / 2, yAt(10 * 60 + 5))
+    await page.mouse.down()
+    await page.mouse.move(box.x + box.width / 2, yAt(11 * 60 + 30), { steps: 10 })
+    await page.mouse.up()
+
+    const peek = page.getByRole('dialog', { name: 'Aperçu de la page' })
+    await expect(peek.getByLabel('Titre de la page')).toBeFocused()
+    await page.keyboard.type('Réunion')
+    await expect(peek.getByRole('list', { name: 'Propriétés' })).toContainText('10:00')
+    await peek.getByRole('button', { name: 'Fermer l’aperçu' }).click()
+    await expect(page.getByRole('button', { name: 'Réunion, 10:00' })).toBeVisible()
+  })
+})

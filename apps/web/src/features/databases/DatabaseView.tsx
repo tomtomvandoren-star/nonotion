@@ -16,6 +16,9 @@ import { requestTitleFocus } from '@/features/pages/useNewPage'
 import { ApiError } from '@/lib/api/client'
 import { useUi } from '@/stores/ui'
 import { BoardView } from './BoardView'
+import { CalendarControls } from './calendar/CalendarControls'
+import { CalendarView } from './calendar/CalendarView'
+import { calendarProperty, type Day, monthWeeks, weekDays } from './calendar/dates'
 import type { ColumnAction } from './ColumnHeader'
 import { visibleColumns } from './columns'
 import { newRule } from './filterLabels'
@@ -65,6 +68,8 @@ function LoadedDatabase({ database, showTitle }: { database: DatabaseDetail; sho
   const [filterOpen, setFilterOpen] = useState(false)
   const [peek, setPeek] = useState<string | null>(null)
   const [title, setTitle] = useState(database.title)
+  // La période affichée par un calendrier : elle reste la même quand on bascule Mois | Semaine.
+  const [anchor, setAnchor] = useState(() => todayIn(timeZone))
 
   const view =
     database.views.find((item) => item.id === activeViews[database.id]) ?? database.views[0]!
@@ -109,6 +114,19 @@ function LoadedDatabase({ database, showTitle }: { database: DatabaseDetail; sho
     requestTitleFocus(row.id)
     openRow(row.id)
   }
+
+  /** Calendrier : un élément daté de ce jour (spec 6.8), ouvert aussitôt, le curseur dans son titre. */
+  const createOn = async (day: Day) => {
+    const property = calendarProperty(database, config.calendar_by)
+    if (!property) return createAtTop()
+    const row = await createRow.mutateAsync({
+      properties: { ...inherited(), [property.id]: { start: day } },
+    })
+    requestTitleFocus(row.id)
+    openRow(row.id)
+  }
+  const calendarMode = config.calendar_mode ?? 'month'
+  const visibleDays = calendarMode === 'week' ? weekDays(anchor) : monthWeeks(anchor).flat()
 
   const onColumnAction = (property: Property, action: ColumnAction) => {
     if (action.kind === 'sort')
@@ -158,7 +176,22 @@ function LoadedDatabase({ database, showTitle }: { database: DatabaseDetail; sho
         onSearch={setSearch}
         filterOpen={filterOpen}
         onFilterOpen={setFilterOpen}
-        onNew={() => void createAtTop()}
+        {...(view.type === 'calendar'
+          ? {
+              // « Ajouter » date l'élément d'aujourd'hui s'il est à l'écran, sinon de la période.
+              onNew: () => void createOn(visibleDays.includes(ctx.today) ? ctx.today : anchor),
+              newLabel: 'Ajouter',
+              leading: (
+                <CalendarControls
+                  mode={calendarMode}
+                  anchor={anchor}
+                  today={ctx.today}
+                  onAnchor={setAnchor}
+                  onMode={(calendar_mode) => setConfig({ ...config, calendar_mode })}
+                />
+              ),
+            }
+          : { onNew: () => void createAtTop() })}
       />
       {view.type === 'list' ? (
         <ListView {...body} />
@@ -166,16 +199,16 @@ function LoadedDatabase({ database, showTitle }: { database: DatabaseDetail; sho
         <GalleryView {...body} />
       ) : view.type === 'board' ? (
         <BoardView {...body} />
+      ) : view.type === 'calendar' ? (
+        <CalendarView
+          {...body}
+          mode={calendarMode}
+          anchor={anchor}
+          today={ctx.today}
+          onCreate={(day) => void createOn(day)}
+        />
       ) : (
-        <>
-          {view.type === 'calendar' && (
-            // La vue Calendrier arrive à la phase 5 ; ses éléments restent visibles en attendant.
-            <p className="mb-1 text-xs text-muted-foreground">
-              L’affichage en calendrier arrive bientôt : en attendant, les éléments sont en tableau.
-            </p>
-          )}
-          <TableView {...body} />
-        </>
+        <TableView {...body} />
       )}
       {peek && (
         <RowPeek

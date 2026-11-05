@@ -161,6 +161,10 @@ it('calcule la date suivante : jours, semaines, mois (fin de mois), ans, plages 
         ['start' => '2026-11-05T08:30:00.000Z', 'repeat' => ['unit' => 'day', 'interval' => 1]],
         ['start' => '2026-11-06T08:30:00.000Z', 'repeat' => ['unit' => 'day', 'interval' => 1]],
     ],
+    'une heure de Bruxelles, par-dessus le passage à l’heure d’été' => [
+        ['start' => '2027-03-22T08:00:00.000Z', 'time_zone' => 'Europe/Brussels', 'repeat' => ['unit' => 'week', 'interval' => 1]],
+        ['start' => '2027-03-29T07:00:00.000Z', 'time_zone' => 'Europe/Brussels', 'repeat' => ['unit' => 'week', 'interval' => 1]],
+    ],
     'une heure avec décalage' => [
         ['start' => '2026-11-05T09:30:00+01:00', 'repeat' => ['unit' => 'month', 'interval' => 1]],
         ['start' => '2026-12-05T09:30:00+01:00', 'repeat' => ['unit' => 'month', 'interval' => 1]],

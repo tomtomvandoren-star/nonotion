@@ -257,6 +257,71 @@
     {
       "property": "date",
       "value": {
+        "start": "2026-11-05T08:30:00.000Z",
+        "end": "2026-11-05T09:30:00.000Z",
+        "time_zone": "Europe/Brussels"
+      },
+      "valid": true
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05T13:30:00Z",
+        "time_zone": "America/Argentina/Buenos_Aires"
+      },
+      "valid": true
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05T13:30:00Z",
+        "time_zone": "Etc/GMT+5"
+      },
+      "valid": true
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05",
+        "time_zone": null
+      },
+      "valid": true
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05T13:30:00Z",
+        "time_zone": "Europe/../etc"
+      },
+      "valid": false
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05T13:30:00Z",
+        "time_zone": ""
+      },
+      "valid": false
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05T13:30:00Z",
+        "time_zone": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      },
+      "valid": false
+    },
+    {
+      "property": "date",
+      "value": {
+        "start": "2026-11-05T13:30:00Z",
+        "time_zone": 3600
+      },
+      "valid": false
+    },
+    {
+      "property": "date",
+      "value": {
         "start": "2026-11-05T25:00:00Z"
       },
       "valid": false

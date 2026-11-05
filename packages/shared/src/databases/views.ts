@@ -99,6 +99,8 @@ export const viewConfigSchema = z.object({
   /** Largeur des colonnes du tableau, en pixels. */
   property_widths: z.record(propertyIdSchema, z.number().int().min(60).max(1000)).optional(),
   calendar_by: propertyIdSchema.nullable().optional(),
+  /** Calendrier : un mois ou une semaine (spec 6.8). */
+  calendar_mode: z.enum(['month', 'week']).optional(),
   open_pages_in: z.enum(OPEN_PAGES_IN).optional(),
   card_size: z.enum(['small', 'medium', 'large']).optional(),
 })

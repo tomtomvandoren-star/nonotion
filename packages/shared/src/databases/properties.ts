@@ -117,11 +117,20 @@ export const repeatSchema = z
 
 export type Repeat = z.infer<typeof repeatSchema>
 
+/**
+ * Fuseau d'origine d'une heure (nom IANA : « Europe/Brussels », « Etc/GMT+5 »…). L'heure reste
+ * stockée en UTC et s'affiche dans le fuseau de l'appareil (spec 6.8) ; le fuseau d'origine sert à
+ * la montrer telle qu'elle a été saisie, et à répéter une tâche à la même heure locale.
+ */
+export const TIME_ZONE_PATTERN = /^[A-Za-z][A-Za-z0-9_+-]*(\/[A-Za-z0-9_+-]+){0,2}$/
+export const timeZoneSchema = z.string().max(64).regex(TIME_ZONE_PATTERN)
+
 export const dateValueSchema = z
   .object({
     start: z.string(),
     end: z.string().nullable().optional(),
     repeat: repeatSchema.nullable().optional(),
+    time_zone: timeZoneSchema.nullable().optional(),
   })
   .strict()
   .refine(({ start }) => isValidDay(start) || isValidInstant(start), { message: 'Date invalide.' })
