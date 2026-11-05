@@ -30,7 +30,8 @@ export const webPlatform: Platform = {
     set: async (key, value) => writeStorage(key, value),
     remove: async (key) => writeStorage(key, null),
   },
-  openExternal: (url) => {
+  // Le navigateur ne dit pas si l'onglet a pu s'ouvrir (noopener) : on considère que oui.
+  openExternal: async (url) => {
     window.open(url, '_blank', 'noopener,noreferrer')
   },
   // Le site se met à jour à chaque déploiement : rien à installer.

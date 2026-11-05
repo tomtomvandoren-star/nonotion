@@ -12,7 +12,7 @@ import {
 } from '@nonotion/shared'
 import { useNavigate } from '@tanstack/react-router'
 import { Link2, Plus } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { requestTitleFocus } from '@/features/pages/useNewPage'
 import { ApiError } from '@/lib/api/client'
@@ -20,8 +20,8 @@ import { useUi } from '@/stores/ui'
 import { BoardView } from './BoardView'
 import { CalendarControls } from './calendar/CalendarControls'
 import { useSyncCalendar } from './calendar/calendarQueries'
-import { CalendarFeedDialog } from './calendar/CalendarFeedDialog'
-import { ImportCalendarDialog } from './calendar/ImportCalendarDialog'
+import { CalendarFeedPanel } from './calendar/CalendarFeedPanel'
+import { ImportCalendarPanel } from './calendar/ImportCalendarPanel'
 import { CalendarView } from './calendar/CalendarView'
 import { calendarProperty, type Day, visibleDays } from './calendar/dates'
 import type { ColumnAction } from './ColumnHeader'
@@ -143,12 +143,14 @@ function LoadedDatabase({ database, showTitle }: { database: DatabaseDetail; sho
   const rename = useRenameDatabase(database.id)
   const [search, setSearch] = useState('')
   const [filterOpen, setFilterOpen] = useState(false)
-  const [peek, setPeek] = useState<string | null>(null)
+  // Le panneau ouvert à droite : une ligne (aperçu), l'import d'un agenda ou le lien ICS. Un seul à la fois.
+  const [panel, setPanel] = useState<
+    { kind: 'row'; rowId: string } | { kind: 'import' } | { kind: 'feed' } | null
+  >(null)
+  const closePanel = useCallback(() => setPanel(null), [])
   const [title, setTitle] = useState(database.title)
   // La période affichée par un calendrier : elle reste la même quand on bascule Mois | Semaine.
   const [anchor, setAnchor] = useState(() => todayIn(timeZone))
-  const [importing, setImporting] = useState(false)
-  const [showingFeed, setShowingFeed] = useState(false)
   const sectionRef = useRef<HTMLElement>(null)
   useSyncOnOpen(database)
 
@@ -179,7 +181,7 @@ function LoadedDatabase({ database, showTitle }: { database: DatabaseDetail; sho
   const openRow = (rowId: string) => {
     if (config.open_pages_in === 'full_page')
       void navigate({ to: '/p/$pageId', params: { pageId: rowId } })
-    else setPeek(rowId)
+    else setPanel({ kind: 'row', rowId })
   }
 
   /** « Nouveau » : un élément vide en tête, ouvert tout de suite, le curseur dans son titre. */
@@ -266,7 +268,7 @@ function LoadedDatabase({ database, showTitle }: { database: DatabaseDetail; sho
         onSearch={setSearch}
         filterOpen={filterOpen}
         onFilterOpen={setFilterOpen}
-        onShowFeed={() => setShowingFeed(true)}
+        onShowFeed={() => setPanel({ kind: 'feed' })}
         {...(view.type === 'calendar'
           ? {
               // « Ajouter » date l'élément d'aujourd'hui s'il est à l'écran, sinon de la période.
@@ -281,8 +283,10 @@ function LoadedDatabase({ database, showTitle }: { database: DatabaseDetail; sho
                   >
                     <Plus aria-hidden /> Nouvel événement
                   </DropdownMenuItem>
-                  {/* Ouverte juste après la fermeture du menu, pas pendant. */}
-                  <DropdownMenuItem onSelect={() => setTimeout(() => setImporting(true), 0)}>
+                  {/* Ouvert juste après la fermeture du menu, pas pendant. */}
+                  <DropdownMenuItem
+                    onSelect={() => setTimeout(() => setPanel({ kind: 'import' }), 0)}
+                  >
                     <Link2 aria-hidden /> Importer un agenda depuis un lien (ICS)
                   </DropdownMenuItem>
                 </>
@@ -312,18 +316,18 @@ function LoadedDatabase({ database, showTitle }: { database: DatabaseDetail; sho
           anchor={anchor}
           today={ctx.today}
           onCreate={(day) => void createOn(day)}
-          onShowFeed={() => setShowingFeed(true)}
+          onShowFeed={() => setPanel({ kind: 'feed' })}
         />
       ) : (
         <TableView {...body} />
       )}
-      <ImportCalendarDialog database={database} open={importing} onOpenChange={setImporting} />
-      <CalendarFeedDialog database={database} open={showingFeed} onOpenChange={setShowingFeed} />
-      {peek && (
+      {panel?.kind === 'import' && <ImportCalendarPanel database={database} onClose={closePanel} />}
+      {panel?.kind === 'feed' && <CalendarFeedPanel database={database} onClose={closePanel} />}
+      {panel?.kind === 'row' && (
         <RowPeek
-          rowId={peek}
+          rowId={panel.rowId}
           mode={config.open_pages_in === 'center_modal' ? 'center' : 'side'}
-          onClose={() => setPeek(null)}
+          onClose={closePanel}
         />
       )}
     </section>

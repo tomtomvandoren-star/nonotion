@@ -9,14 +9,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { AlertTriangle, ArrowLeft } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { SidePanel } from '@/features/layout/SidePanel'
 import { previewCalendar } from '@/lib/api/calendars'
 import { cn } from '@/lib/utils'
 import { formatDate } from '../values'
@@ -34,18 +27,17 @@ const field =
   'h-9 w-full rounded-md border border-border bg-background px-2.5 text-sm outline-none focus-visible:border-primary'
 
 /**
- * « Importer un agenda depuis un lien (ICS) » (spec 6.9), une modale en deux étapes : le lien et
- * ses réglages, puis l'aperçu (combien d'événements, sur quelle période, les prochains). On voit
- * avant d'engager : pas 2 000 événements dans la base par erreur.
+ * « Importer un agenda depuis un lien (ICS) » (spec 6.9), en deux étapes : le lien et ses réglages
+ * (nom, couleur, mise à jour, base), puis l'aperçu (combien d'événements, sur quelle période, les
+ * prochains). On voit avant d'engager : pas 2 000 événements dans la base par erreur. Dans le même
+ * panneau à droite que l'aperçu d'une tâche.
  */
-export function ImportCalendarDialog({
+export function ImportCalendarPanel({
   database,
-  open,
-  onOpenChange,
+  onClose,
 }: {
   database: DatabaseDetail
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  onClose: () => void
 }) {
   const navigate = useNavigate()
   const importer = useImportCalendar()
@@ -58,12 +50,6 @@ export function ImportCalendarDialog({
   const [preview, setPreview] = useState<CalendarPreview | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  const close = () => {
-    onOpenChange(false)
-    setPreview(null)
-    setError(null)
-  }
 
   const showPreview = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -109,9 +95,7 @@ export function ImportCalendarDialog({
             : {}),
         },
       )
-      close()
-      setUrl('')
-      setName('')
+      onClose()
     } catch (failure) {
       setError(calendarError(failure))
     }
@@ -121,23 +105,27 @@ export function ImportCalendarDialog({
     try {
       await sync.mutateAsync(sourceId)
       toast.success('Agenda mis à jour.')
-      close()
+      onClose()
     } catch (failure) {
       setError(calendarError(failure))
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Importer un agenda depuis un lien</DialogTitle>
-          <DialogDescription>
+    <SidePanel
+      label="Importer un agenda depuis un lien"
+      className="max-w-[min(520px,100vw)]"
+      onClose={onClose}
+    >
+      <div className="grid gap-4 px-5 pb-8">
+        <header className="grid gap-1">
+          <h2 className="text-lg font-semibold">Importer un agenda depuis un lien</h2>
+          <p className="text-sm text-muted-foreground">
             {preview
               ? 'Voici ce que contient l’agenda. Rien n’est encore ajouté à la base.'
               : 'Google Agenda, Outlook, iCloud, emploi du temps… sans compte, juste avec un lien.'}
-          </DialogDescription>
-        </DialogHeader>
+          </p>
+        </header>
 
         {!preview ? (
           <form
@@ -191,7 +179,13 @@ export function ImportCalendarDialog({
             </div>
 
             <fieldset className="grid gap-1.5">
-              <legend className="mb-1.5 text-sm font-medium">Couleur</legend>
+              <legend className="mb-1.5 text-sm font-medium">
+                Couleur des événements importés
+                <span className="font-normal text-muted-foreground">
+                  {' '}
+                  · {OPTION_COLOR_LABELS[color]}
+                </span>
+              </legend>
               <div role="radiogroup" aria-label="Couleur" className="flex flex-wrap gap-1.5">
                 {COLORS.map((value) => (
                   <button
@@ -286,7 +280,7 @@ export function ImportCalendarDialog({
           </div>
         )}
 
-        <DialogFooter>
+        <div className="flex flex-wrap justify-end gap-2">
           {preview ? (
             <>
               <button
@@ -309,7 +303,7 @@ export function ImportCalendarDialog({
             <>
               <button
                 type="button"
-                onClick={close}
+                onClick={onClose}
                 className="h-9 rounded-md px-3 text-sm hover:bg-accent"
               >
                 Annuler
@@ -324,9 +318,9 @@ export function ImportCalendarDialog({
               </button>
             </>
           )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </div>
+    </SidePanel>
   )
 }
 

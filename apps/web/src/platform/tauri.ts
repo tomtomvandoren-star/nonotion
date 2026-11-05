@@ -23,9 +23,7 @@ function isExternal(href: string): boolean {
   }
 }
 
-function openExternal(url: string): void {
-  void openUrl(url)
-}
+const openExternal = (url: string) => openUrl(url)
 
 // Un lien vers un autre site ne remplace jamais l'application dans sa fenêtre : il s'ouvre dans le
 // navigateur. Dans l'éditeur, un clic sur un lien ne fait rien (comme sur le web) ; sa barre d'outils
@@ -37,7 +35,7 @@ document.addEventListener(
     if (!anchor || anchor.isContentEditable) return
     if (!isExternal(anchor.href)) return
     event.preventDefault()
-    openExternal(anchor.href)
+    void openExternal(anchor.href).catch(() => undefined)
   },
   true,
 )
@@ -45,7 +43,7 @@ const openInWindow = window.open.bind(window)
 window.open = (url, target, features) => {
   const href = url?.toString()
   if (href && isExternal(href)) {
-    openExternal(href)
+    void openExternal(href).catch(() => undefined)
     return null
   }
   return openInWindow(url, target, features)

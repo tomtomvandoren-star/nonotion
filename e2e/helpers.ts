@@ -120,3 +120,23 @@ export function waitForContentSave(page: Page) {
       response.request().method() === 'PUT' && /\/api\/pages\/[^/]+\/content$/.test(response.url()),
   )
 }
+
+/**
+ * Le panneau est vraiment visible, au-dessus de la page : ce qu'on trouve en son centre lui
+ * appartient. toBeVisible() ne suffit pas (un panneau caché derrière la page, ou transparent, l'est).
+ */
+export async function expectOnTop(panel: Locator) {
+  await expect(panel).toBeVisible()
+  await expect
+    .poll(() =>
+      panel.evaluate((element) => {
+        const box = element.getBoundingClientRect()
+        const hit = document.elementFromPoint(
+          box.x + box.width / 2,
+          box.y + Math.min(box.height / 2, 200),
+        )
+        return hit !== null && element.contains(hit) && getComputedStyle(element).opacity === '1'
+      }),
+    )
+    .toBe(true)
+}

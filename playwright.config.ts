@@ -13,7 +13,8 @@ export default defineConfig({
   forbidOnly: isCI,
   retries: isCI ? 2 : 0,
   use: {
-    baseURL: 'http://localhost:5173',
+    // E2E_BASE_URL : jouer les tests sur un autre front, comme le build de production (vite preview).
+    baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:5173',
     trace: 'on-first-retry',
   },
   projects: [
@@ -31,10 +32,15 @@ export default defineConfig({
       timeout: 120_000,
     },
     {
-      command: 'node node_modules/vite/bin/vite.js',
+      // En CI, le build de production, celui que reçoivent les utilisateurs (vite preview relaie /api
+      // comme le serveur de dev) ; en local, le serveur de dev.
+      command: isCI
+        ? 'node node_modules/vite/bin/vite.js build && node node_modules/vite/bin/vite.js preview --port 5173 --strictPort'
+        : 'node node_modules/vite/bin/vite.js',
       cwd: 'apps/web',
       url: 'http://localhost:5173',
       reuseExistingServer: !isCI,
+      timeout: 180_000,
     },
   ],
 })

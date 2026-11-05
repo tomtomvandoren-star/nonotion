@@ -83,7 +83,7 @@ export function ViewToolbar({
   newLabel?: string
   /** Les éléments du menu ▾ du bouton (« Importer un agenda… ») ; sans eux, pas de flèche. */
   newMenu?: React.ReactNode
-  /** Afficher la base dans Google Agenda ou le Calendrier Apple. */
+  /** « Créer un lien ICS » : la base dans Google Agenda, le Calendrier Apple, Outlook… */
   onShowFeed: () => void
 }) {
   const config = view.config
@@ -578,7 +578,12 @@ function OptionsMenu({
           <Ellipsis aria-hidden className="size-4" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-60">
+      {/* Le panneau du lien ICS prend le focus : le menu ne le rend pas à son bouton en se fermant. */}
+      <DropdownMenuContent
+        align="end"
+        className="w-60"
+        onCloseAutoFocus={(event) => event.preventDefault()}
+      >
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
             {board ? 'Colonnes par' : 'Regrouper par'}
@@ -640,7 +645,7 @@ function OptionsMenu({
           </DropdownMenuSubContent>
         </DropdownMenuSub>
         <DropdownMenuItem onSelect={() => setTimeout(onShowFeed, 0)}>
-          <CalendarPlus aria-hidden /> Afficher dans Google ou Apple…
+          <CalendarPlus aria-hidden /> Créer un lien ICS…
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">

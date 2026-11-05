@@ -1,6 +1,6 @@
 import { createServer, type Server } from 'node:http'
 import { expect, test, type Page } from '@playwright/test'
-import { createPage, editorOf, signUpAndOpen } from './helpers'
+import { createPage, editorOf, expectOnTop, signUpAndOpen } from './helpers'
 
 /*
  * Import d'un agenda par lien ICS (spec 6.9). Un petit serveur local sert l'agenda ; l'API ne
@@ -112,8 +112,11 @@ async function importAgenda(page: Page) {
   await page.getByRole('button', { name: 'Autres façons d’ajouter' }).click()
   await page.getByRole('menuitem', { name: 'Importer un agenda depuis un lien (ICS)' }).click()
   const dialog = page.getByRole('dialog', { name: 'Importer un agenda depuis un lien' })
+  await expectOnTop(dialog)
+  await expect(dialog.getByLabel('Lien de l’agenda (ICS)')).toBeFocused()
   await dialog.getByLabel('Lien de l’agenda (ICS)').fill(`http://127.0.0.1:${port}/quartier.ics`)
   await dialog.getByRole('radio', { name: 'Violet' }).click()
+  await expect(dialog).toContainText('Couleur des événements importés · Violet')
   await dialog.getByRole('button', { name: 'Prévisualiser' }).click()
 
   // L'aperçu : 5 chorales (6 moins l'exception), la fête, l'appel ; le nom de l'agenda proposé.

@@ -28,8 +28,11 @@ export interface Platform {
     set(key: string, value: string): Promise<void>
     remove(key: string): Promise<void>
   }
-  /** Ouvre un lien dans le navigateur (ou l'application d'agenda, pour webcal:) du système. */
-  openExternal(url: string): void
+  /**
+   * Ouvre un lien dans le navigateur (ou l'application d'agenda, pour webcal:) du système. Échoue
+   * quand rien ne sait l'ouvrir (webcal: sans application d'agenda, par exemple).
+   */
+  openExternal(url: string): Promise<void>
   /** La mise à jour disponible de l'application installée ; toujours null sur le web. */
   checkForUpdate(): Promise<AppUpdate | null>
 }

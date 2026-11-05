@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
-import { createPage, editorOf, signUpAndOpen } from './helpers'
+import { createPage, editorOf, expectOnTop, signUpAndOpen } from './helpers'
 
 /** Une base de tâches (modèle) ouverte sur sa vue Calendrier, par Échéance. */
 async function openCalendar(page: Page) {
@@ -168,7 +168,7 @@ test.describe('6.8 Vue Calendrier', () => {
   })
 })
 
-test.describe('Répéter, heures et abonnement Google / Apple', () => {
+test.describe('Répéter, heures et lien ICS', () => {
   test('une tâche qui se répète 3 fois montre ses 2 prochaines fois dans le calendrier', async ({
     page,
     request,
@@ -213,7 +213,7 @@ test.describe('Répéter, heures et abonnement Google / Apple', () => {
     await expect(ghosts.last()).toHaveAttribute('data-day-start', day(14))
   })
 
-  test('« Afficher dans Google ou Apple » : un lien d’abonnement qui publie les tâches', async ({
+  test('« Créer un lien ICS » : un lien d’abonnement qui publie les tâches', async ({
     page,
     request,
   }) => {
@@ -222,16 +222,28 @@ test.describe('Répéter, heures et abonnement Google / Apple', () => {
     const { todayLabel } = await days(page)
     await createOn(page, todayLabel, 'Réunion de quartier')
 
-    await page.getByRole('button', { name: 'Afficher dans Google ou Apple' }).click()
-    const dialog = page.getByRole('dialog', { name: 'Afficher dans votre agenda' })
-    await dialog.getByRole('button', { name: 'Créer le lien d’abonnement' }).click()
-    await expect(dialog.getByRole('button', { name: 'Ajouter à Google Agenda' })).toBeVisible()
-    await expect(dialog.getByRole('button', { name: 'Ajouter au Calendrier Apple' })).toBeVisible()
+    await page.getByRole('button', { name: 'Créer un lien ICS' }).click()
+    const panel = page.getByRole('dialog', { name: 'Créer un lien ICS' })
+    await expectOnTop(panel)
+    await panel.getByRole('button', { name: 'Créer le lien ICS' }).click()
+    await expect(panel.getByRole('button', { name: 'Copier le lien' })).toBeVisible()
+    await expect(panel.getByRole('button', { name: 'Ajouter à Google Agenda' })).toBeVisible()
+    // Hors Mac, iPhone et iPad, webcal: n'ouvre rien : on explique plutôt comment faire.
+    await expect(panel.getByRole('button', { name: 'Ajouter au Calendrier Apple' })).toHaveCount(0)
+    await expect(panel).toContainText('Calendrier Apple : ouvrez Nonotion sur votre iPhone')
 
     // Le flux, tel que Google ou Apple le lisent : sans être connecté.
-    const url = await dialog.getByLabel('Lien d’abonnement').inputValue()
+    const url = await panel.getByLabel('Lien ICS').inputValue()
     const feed = await page.request.get(url)
     expect(feed.headers()['content-type']).toContain('text/calendar')
     expect(await feed.text()).toContain('SUMMARY:Réunion de quartier')
+
+    // Échap ferme le panneau ; il revient par le menu « … » de la vue.
+    await page.keyboard.press('Escape')
+    await expect(panel).toHaveCount(0)
+    await page.getByRole('button', { name: 'Options de la vue', exact: true }).click()
+    await page.getByRole('menuitem', { name: 'Créer un lien ICS…' }).click()
+    await expectOnTop(panel)
+    await expect(panel.getByLabel('Lien ICS')).toHaveValue(url)
   })
 })

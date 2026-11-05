@@ -262,7 +262,7 @@ function WorkspaceMenu() {
           <span className="ml-auto text-xs text-muted-foreground">{shortcutLabel('/')}</span>
         </DropdownMenuItem>
         {platform.kind === 'web' && (
-          <DropdownMenuItem onSelect={() => platform.openExternal(DESKTOP_DOWNLOADS_URL)}>
+          <DropdownMenuItem onSelect={() => void platform.openExternal(DESKTOP_DOWNLOADS_URL)}>
             <Download /> Application pour ordinateur
           </DropdownMenuItem>
         )}

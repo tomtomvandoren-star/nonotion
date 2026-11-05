@@ -35,7 +35,7 @@ export type CalendarProps = ViewBodyProps & {
   today: Day
   /** Un élément daté de ce jour, ouvert aussitôt, le curseur dans son titre. */
   onCreate: (day: Day) => void
-  /** Afficher la base dans Google Agenda ou le Calendrier Apple. */
+  /** « Créer un lien ICS » : la base dans Google Agenda, le Calendrier Apple, Outlook… */
   onShowFeed: () => void
 }
 
@@ -188,7 +188,7 @@ function Calendar({
           className="flex h-8 items-center gap-1.5 rounded-sm px-1 text-left text-sm text-muted-foreground hover:bg-accent touch:h-10"
         >
           <CalendarPlus aria-hidden className="size-4 shrink-0" />
-          Afficher dans Google ou Apple
+          Créer un lien ICS
         </button>
       </div>
       <div className="min-w-0 flex-1">
