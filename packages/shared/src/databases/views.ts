@@ -88,6 +88,9 @@ export const groupBySchema = z.object({
   hidden: z.array(z.string().max(32)).max(200).optional(),
 })
 
+export const CALENDAR_VIEW_MODES = ['month', 'week', 'day'] as const
+export type CalendarMode = (typeof CALENDAR_VIEW_MODES)[number]
+
 export const OPEN_PAGES_IN = ['side_peek', 'center_modal', 'full_page'] as const
 
 export const viewConfigSchema = z.object({
@@ -99,8 +102,8 @@ export const viewConfigSchema = z.object({
   /** Largeur des colonnes du tableau, en pixels. */
   property_widths: z.record(propertyIdSchema, z.number().int().min(60).max(1000)).optional(),
   calendar_by: propertyIdSchema.nullable().optional(),
-  /** Calendrier : un mois ou une semaine (spec 6.8). */
-  calendar_mode: z.enum(['month', 'week']).optional(),
+  /** Calendrier : un mois, une semaine (spec 6.8) ou un jour (raccourci D, spec 6.14). */
+  calendar_mode: z.enum(CALENDAR_VIEW_MODES).optional(),
   /** Calendrier : les agendas importés masqués (« Mes agendas »). */
   hidden_sources: z.array(z.string().max(32)).max(100).optional(),
   open_pages_in: z.enum(OPEN_PAGES_IN).optional(),

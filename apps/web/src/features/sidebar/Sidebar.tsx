@@ -1,13 +1,30 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { ChevronsLeft, Home, LogOut, Plus, SquarePen, Trash2 } from 'lucide-react'
+import {
+  ChevronsLeft,
+  Home,
+  Keyboard,
+  LogOut,
+  Monitor,
+  Moon,
+  Plus,
+  Search,
+  SquarePen,
+  Sun,
+  Trash2,
+} from 'lucide-react'
 import { useMemo, useRef } from 'react'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -19,7 +36,7 @@ import { logout } from '@/lib/api/auth'
 import { endSession } from '@/lib/session'
 import { shortcutLabel } from '@/lib/shortcuts'
 import { cn } from '@/lib/utils'
-import { SIDEBAR_MAX, SIDEBAR_MIN, useUi } from '@/stores/ui'
+import { SIDEBAR_MAX, SIDEBAR_MIN, type Theme, useUi } from '@/stores/ui'
 import { PageTree } from './PageTree'
 import { TrashPanel } from './TrashPanel'
 
@@ -32,6 +49,7 @@ export function Sidebar() {
   const setOpen = useUi((s) => s.setSidebarOpen)
   const tree = useTree()
   const newPage = useNewPage()
+  const setSearchOpen = useUi((s) => s.setSearchOpen)
   const favorites = useMemo(() => tree.data?.filter((page) => page.is_favorite) ?? [], [tree.data])
 
   return (
@@ -62,6 +80,14 @@ export function Sidebar() {
       </div>
 
       <nav className="flex flex-col px-2 pb-2" aria-label="Navigation">
+        {/* La recherche, en tête (spec 6.1) : au doigt aussi, sans Ctrl+K. */}
+        <button type="button" onClick={() => setSearchOpen(true)} className={sidebarItemClass}>
+          <Search aria-hidden className="size-4 text-muted-foreground" />
+          Rechercher
+          <kbd className="ml-auto font-sans text-xs text-muted-foreground touch:hidden">
+            {shortcutLabel('k')}
+          </kbd>
+        </button>
         <SidebarLink icon={<Home aria-hidden className="size-4" />} label="Accueil" />
         <button type="button" onClick={() => newPage(null)} className={sidebarItemClass}>
           <SquarePen aria-hidden className="size-4 text-muted-foreground" />
@@ -179,6 +205,9 @@ function WorkspaceMenu() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const workspace = profile.data?.workspaces[0]
+  const theme = useUi((s) => s.theme)
+  const setTheme = useUi((s) => s.setTheme)
+  const setShortcutsOpen = useUi((s) => s.setShortcutsOpen)
   const initial = (workspace?.name.replace(/^Espace de /, '') ?? '?').charAt(0).toUpperCase()
 
   const signOut = async () => {
@@ -205,6 +234,26 @@ function WorkspaceMenu() {
         <DropdownMenuLabel className="font-normal text-muted-foreground">
           {profile.data?.user.email}
         </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            {theme === 'dark' ? <Moon /> : theme === 'light' ? <Sun /> : <Monitor />} Thème
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            <DropdownMenuRadioGroup
+              value={theme}
+              onValueChange={(value) => setTheme(value as Theme)}
+            >
+              <DropdownMenuRadioItem value="system">Comme le système</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="light">Clair</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="dark">Sombre</DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuItem onSelect={() => setShortcutsOpen(true)}>
+          <Keyboard /> Raccourcis clavier
+          <span className="ml-auto text-xs text-muted-foreground">{shortcutLabel('/')}</span>
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => void signOut()}>
           <LogOut /> Se déconnecter

@@ -17,6 +17,7 @@ import { BlockNoteView } from '@blocknote/shadcn'
 import type { PageContent } from '@nonotion/shared'
 import { Database, ListTodo, SmilePlus, Table2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { useResolvedTheme } from '@/lib/theme'
 import { useEffect, useImperativeHandle, useRef } from 'react'
 import { BlockSideMenu, SelectionToolbar } from './BlockMenus'
 import { BLOCK_CHOICES, filterChoices } from './blockChoices'
@@ -265,9 +266,12 @@ export default function BlockEditor({
     [editor],
   )
 
+  const theme = useResolvedTheme()
+
   return (
     <BlockNoteView
       editor={editor}
+      theme={theme}
       onChange={onChange}
       slashMenu={false}
       sideMenu={false}

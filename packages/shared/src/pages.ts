@@ -32,6 +32,18 @@ export const pageDetailSchema = pageTreeItemSchema.extend({
   created_at: isoDate.nullable(),
 })
 
+/** Un résultat de recherche (spec 6.12) : la page, où elle se trouve, et un extrait. */
+export const searchResultSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  icon: z.string().nullable(),
+  database_id: z.string().nullable(),
+  /** Sa base pour une ligne, sinon sa page parente. */
+  context: z.string().nullable(),
+  excerpt: z.string().nullable(),
+  updated_at: isoDate.nullable(),
+})
+
 export const trashItemSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -43,3 +55,4 @@ export type PageTreeItem = z.infer<typeof pageTreeItemSchema>
 export type PageDetail = z.infer<typeof pageDetailSchema>
 export type PageContent = z.infer<typeof pageContentSchema>
 export type TrashItem = z.infer<typeof trashItemSchema>
+export type SearchResult = z.infer<typeof searchResultSchema>

@@ -3,6 +3,7 @@
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\Onboarding;
+use Illuminate\Foundation\Testing\DatabaseTruncation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -14,6 +15,14 @@ use Tests\TestCase;
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
     ->in('Feature');
+
+/*
+| La recherche plein texte : l'index FULLTEXT d'InnoDB ne voit que les données validées (commit),
+| pas celles d'une transaction de test. Ces tests écrivent donc pour de vrai, puis vident les tables.
+*/
+pest()->extend(TestCase::class)
+    ->use(DatabaseTruncation::class)
+    ->in('Search');
 
 /** Crée un compte (avec son workspace et sa page de bienvenue). */
 function createAccount(string $name = 'Alice'): User

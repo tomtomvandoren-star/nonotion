@@ -12,7 +12,7 @@ import {
 } from '@nonotion/shared'
 import { useNavigate } from '@tanstack/react-router'
 import { Link2, Plus } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { requestTitleFocus } from '@/features/pages/useNewPage'
 import { ApiError } from '@/lib/api/client'
@@ -22,7 +22,7 @@ import { CalendarControls } from './calendar/CalendarControls'
 import { useSyncCalendar } from './calendar/calendarQueries'
 import { ImportCalendarDialog } from './calendar/ImportCalendarDialog'
 import { CalendarView } from './calendar/CalendarView'
-import { calendarProperty, type Day, monthWeeks, weekDays } from './calendar/dates'
+import { calendarProperty, type Day, visibleDays } from './calendar/dates'
 import type { ColumnAction } from './ColumnHeader'
 import { visibleColumns } from './columns'
 import { newRule } from './filterLabels'
@@ -34,6 +34,52 @@ import { ViewTabs } from './ViewTabs'
 import { ViewToolbar } from './ViewToolbar'
 
 const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+
+const CALENDAR_KEYS = { d: 'day', w: 'week', m: 'month' } as const
+
+/**
+ * Une touche qu'on tape dans un champ ou dans le texte d'une page ne pilote pas le calendrier.
+ * isContentEditable, pas l'attribut : la base vit dans l'éditeur, mais en îlot non modifiable.
+ */
+function isTyping(target: EventTarget | null): boolean {
+  const element = target instanceof HTMLElement ? target : null
+  return Boolean(
+    element &&
+    (element.isContentEditable ||
+      element.closest('input, textarea, select, [role="dialog"], [role="menu"]')),
+  )
+}
+
+/**
+ * Raccourcis du calendrier (spec 6.14) : D jour, W semaine, M mois, T aujourd'hui. Pour le
+ * calendrier où se trouve le focus, sinon le premier de la page.
+ */
+function useCalendarKeys(
+  section: React.RefObject<HTMLElement | null>,
+  active: boolean,
+  onKey: (key: 'd' | 'w' | 'm' | 't') => void,
+) {
+  const handler = useRef(onKey)
+  useEffect(() => {
+    handler.current = onKey
+  })
+  useEffect(() => {
+    if (!active) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase()
+      if (event.ctrlKey || event.metaKey || event.altKey || !['d', 'w', 'm', 't'].includes(key))
+        return
+      if (isTyping(event.target) || document.querySelector('[role="dialog"]')) return
+      const roots = [...document.querySelectorAll<HTMLElement>('[data-calendar-root]')]
+      const focused = roots.find((root) => root.contains(document.activeElement))
+      if ((focused ?? roots[0]) !== section.current) return
+      event.preventDefault()
+      handler.current(key as 'd' | 'w' | 'm' | 't')
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [active, section])
+}
 
 /** Les agendas déjà resynchronisés à l'ouverture, pendant cette session. */
 const syncedOnOpen = new Set<string>()
@@ -101,6 +147,7 @@ function LoadedDatabase({ database, showTitle }: { database: DatabaseDetail; sho
   // La période affichée par un calendrier : elle reste la même quand on bascule Mois | Semaine.
   const [anchor, setAnchor] = useState(() => todayIn(timeZone))
   const [importing, setImporting] = useState(false)
+  const sectionRef = useRef<HTMLElement>(null)
   useSyncOnOpen(database)
 
   const view =
@@ -158,7 +205,11 @@ function LoadedDatabase({ database, showTitle }: { database: DatabaseDetail; sho
     openRow(row.id)
   }
   const calendarMode = config.calendar_mode ?? 'month'
-  const visibleDays = calendarMode === 'week' ? weekDays(anchor) : monthWeeks(anchor).flat()
+  const shownDays = visibleDays(calendarMode, anchor)
+  useCalendarKeys(sectionRef, view.type === 'calendar', (key) => {
+    if (key === 't') setAnchor(ctx.today)
+    else setConfig({ ...config, calendar_mode: CALENDAR_KEYS[key] })
+  })
 
   const onColumnAction = (property: Property, action: ColumnAction) => {
     if (action.kind === 'sort')
@@ -181,7 +232,12 @@ function LoadedDatabase({ database, showTitle }: { database: DatabaseDetail; sho
   const body = { database, view, rows, groups, onOpenRow: openRow, inherited, onColumnAction }
 
   return (
-    <section aria-label={database.title || 'Base sans titre'} className="nn-database my-1">
+    <section
+      ref={sectionRef}
+      aria-label={database.title || 'Base sans titre'}
+      data-calendar-root={view.type === 'calendar' || undefined}
+      className="nn-database my-1"
+    >
       {showTitle && (
         <input
           aria-label="Titre de la base"
@@ -211,13 +267,13 @@ function LoadedDatabase({ database, showTitle }: { database: DatabaseDetail; sho
         {...(view.type === 'calendar'
           ? {
               // « Ajouter » date l'élément d'aujourd'hui s'il est à l'écran, sinon de la période.
-              onNew: () => void createOn(visibleDays.includes(ctx.today) ? ctx.today : anchor),
+              onNew: () => void createOn(shownDays.includes(ctx.today) ? ctx.today : anchor),
               newLabel: 'Ajouter',
               newMenu: (
                 <>
                   <DropdownMenuItem
                     onSelect={() =>
-                      void createOn(visibleDays.includes(ctx.today) ? ctx.today : anchor)
+                      void createOn(shownDays.includes(ctx.today) ? ctx.today : anchor)
                     }
                   >
                     <Plus aria-hidden /> Nouvel événement

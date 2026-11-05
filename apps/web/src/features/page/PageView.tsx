@@ -80,6 +80,11 @@ export function PageView({
 
 function PageDocument({ page, variant }: { page: PageDetail; variant: 'page' | 'peek' }) {
   const updatePage = useUpdatePage()
+  const rememberPage = useUi((s) => s.rememberPage)
+  // Une page ouverte (titre à jour) rejoint les « récentes » de la recherche (spec 6.12).
+  useEffect(() => {
+    rememberPage({ id: page.id, title: page.title, icon: page.icon })
+  }, [rememberPage, page.id, page.title, page.icon])
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const editorRef = useRef<BlockEditorHandle>(null)
   const cover = page.cover_url ? coverStyle(page.cover_url) : null

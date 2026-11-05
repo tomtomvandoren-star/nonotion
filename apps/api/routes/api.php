@@ -7,6 +7,7 @@ use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\PropertyController;
+use App\Http\Controllers\SearchController;
 use App\Http\Controllers\TrashController;
 use App\Http\Controllers\ViewController;
 use Illuminate\Support\Facades\Route;
@@ -33,6 +34,7 @@ Route::middleware(['auth:sanctum', 'throttle:240,1'])->group(function () {
     Route::get('/workspaces/{workspace}/pages', [PageController::class, 'index']);
     Route::post('/workspaces/{workspace}/pages', [PageController::class, 'store']);
     Route::get('/workspaces/{workspace}/trash', [TrashController::class, 'index']);
+    Route::get('/workspaces/{workspace}/search', SearchController::class);
 
     Route::get('/pages/{page}', [PageController::class, 'show']);
     Route::patch('/pages/{page}', [PageController::class, 'update']);

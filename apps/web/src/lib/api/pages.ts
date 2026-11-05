@@ -1,6 +1,7 @@
 import {
   pageDetailSchema,
   pageTreeItemSchema,
+  searchResultSchema,
   trashItemSchema,
   type PageContent,
 } from '@nonotion/shared'
@@ -12,6 +13,14 @@ const dataOf = <T extends z.ZodType>(schema: T) => z.object({ data: schema })
 
 export const fetchTree = (workspaceId: string) =>
   apiGet(`workspaces/${workspaceId}/pages`, dataOf(z.array(pageTreeItemSchema))).then((r) => r.data)
+
+/** Recherche plein texte dans les titres et le texte des pages (spec 6.12). */
+export const searchPages = (workspaceId: string, q: string, signal?: AbortSignal) =>
+  apiGet(
+    `workspaces/${workspaceId}/search?${new URLSearchParams({ q })}`,
+    dataOf(z.array(searchResultSchema)),
+    signal,
+  ).then((r) => r.data)
 
 export const fetchPage = (pageId: string) =>
   apiGet(`pages/${pageId}`, dataOf(pageDetailSchema)).then((r) => r.data)

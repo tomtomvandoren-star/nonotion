@@ -44,7 +44,7 @@ class ViewConfigRules
             "{$prefix}.property_widths" => ['sometimes', 'array', self::idKeys()],
             "{$prefix}.property_widths.*" => ['integer', 'min:60', 'max:1000'],
             "{$prefix}.calendar_by" => ['sometimes', 'nullable', 'string', $id],
-            "{$prefix}.calendar_mode" => ['sometimes', 'in:month,week'],
+            "{$prefix}.calendar_mode" => ['sometimes', 'in:month,week,day'],
             // Calendrier : les agendas importés masqués (« Mes agendas », spec 6.8).
             "{$prefix}.hidden_sources" => ['sometimes', 'array', 'list', 'max:100'],
             "{$prefix}.hidden_sources.*" => ['string', 'max:32'],

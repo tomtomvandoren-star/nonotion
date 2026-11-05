@@ -1,4 +1,5 @@
 import {
+  type CalendarMode,
   type DatabaseRowData,
   dateValueSchema,
   type DateValue,
@@ -27,7 +28,7 @@ import { type DragStart, useCalendarDrag } from './useCalendarDrag'
 import { WeekView } from './WeekView'
 
 export type CalendarProps = ViewBodyProps & {
-  mode: 'month' | 'week'
+  mode: CalendarMode
   anchor: Day
   today: Day
   /** Un élément daté de ce jour, ouvert aussitôt, le curseur dans son titre. */
@@ -170,7 +171,11 @@ function Calendar({
         />
       </div>
       <div className="min-w-0 flex-1">
-        {mode === 'week' ? <WeekView {...grid} creating={creating} /> : <MonthView {...grid} />}
+        {mode === 'month' ? (
+          <MonthView {...grid} />
+        ) : (
+          <WeekView {...grid} creating={creating} single={mode === 'day'} />
+        )}
       </div>
     </div>
   )

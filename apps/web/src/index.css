@@ -193,6 +193,12 @@
   }
 }
 
+/* L'éditeur se fond dans la page, dans les deux thèmes : pas de fond ni d'angles à lui. */
+.nn-editor .bn-editor {
+  background-color: transparent;
+  border-radius: 0;
+}
+
 /* Une tâche terminée (spec 6.7) : titre grisé et barré, comme une to-do cochée. */
 .nn-task-title {
   text-decoration: line-through;

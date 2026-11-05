@@ -170,3 +170,14 @@ Une ligne par décision : la décision, puis sa raison (spec, section 0, règle 
 - **« Mes agendas » et « Sans date » partagent une colonne à gauche du calendrier (sous lui sur téléphone).** Deux panneaux de part et d'autre écrasaient la grille dans la colonne de la page. Afficher ou masquer un agenda est un réglage de la vue (`hidden_sources`).
 - **« + Ajouter ▾ » : Nouvel événement, Importer un agenda depuis un lien (ICS).** L'import d'un fichier .ics depuis l'appareil viendra plus tard (spec 6.8).
 - **L'aperçu propose le nom que l'agenda se donne (X-WR-CALNAME).** Un champ de moins à remplir.
+
+## Phase 7
+
+- **Recherche (Ctrl+K) : le texte des pages par l'index FULLTEXT de MariaDB, chaque mot en début de mot (« proj » trouve « projet »), plus les titres qui contiennent la saisie.** Les mots de moins de 3 lettres ne sont pas dans l'index : une recherche courte ne regarde que les titres. Les titres qui commencent par la saisie passent devant, puis la pertinence. Les lignes de bases sont trouvées aussi, avec le nom de leur base ; la corbeille, non. 20 résultats au plus.
+- **La fenêtre montre d'abord les titres déjà chargés (instantané), puis ce que le serveur trouve dans le texte, 200 ms après la dernière lettre.** Une recherche dépassée est abandonnée. Majuscules et accents sont ignorés, dans l'index (collation) comme dans le surlignage et l'extrait.
+- **Champ vide : les 8 dernières pages ouvertes sur cet appareil.** Gardées avec les autres préférences d'affichage locales (largeur de la barre latérale…), pas en base.
+- **Les tests de la recherche écrivent pour de vrai (DatabaseTruncation), à part des autres.** L'index FULLTEXT d'InnoDB ne voit pas les lignes d'une transaction non validée.
+- **Ctrl+K, Ctrl+/ et les autres raccourcis globaux sont écoutés avant l'éditeur.** Sinon Ctrl+K y créerait un lien. Sur téléphone, la recherche est dans la barre latérale et l'aide dans le menu de l'espace de travail.
+- **D, W, M, T pilotent le calendrier où se trouve le focus, sinon le premier de la page ; jamais en écrivant (champ, texte d'une page, fenêtre ouverte).** D ouvre une vue Jour, ajoutée à la bascule (Mois | Semaine | Jour) : la spec 6.14 la demande, et elle sert sur téléphone où 7 colonnes sont étroites.
+- **Thème : « Comme le système » par défaut, ou Clair, ou Sombre, dans le menu de l'espace de travail ; choix de l'appareil.** Appliqué avant le premier affichage (pas d'éclair blanc) et transmis à l'éditeur, qui ne lit pas les variables CSS. L'éditeur n'a plus de fond à lui : il se fond dans la page dans les deux thèmes.
+- **Téléphone : le clavier redimensionne la page (interactive-widget=resizes-content), pour que la barre de mise en forme reste au-dessus ; boutons des barres d'outils et du calendrier de 40 px au doigt.** Le tableau et le Board défilent à l'horizontale dans leur cadre, jamais la page.

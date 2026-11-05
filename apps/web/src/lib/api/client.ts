@@ -51,7 +51,7 @@ export async function apiRequest<T>(
   path: string,
   schema: z.ZodType<T>,
   body?: unknown,
-  { keepalive = false }: { keepalive?: boolean } = {},
+  { keepalive = false, signal }: { keepalive?: boolean; signal?: AbortSignal } = {},
 ): Promise<T> {
   const token = getToken()
   const headers: Record<string, string> = { Accept: 'application/json' }
@@ -63,6 +63,7 @@ export async function apiRequest<T>(
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
     keepalive,
+    signal,
   })
 
   const data: unknown = response.status === 204 ? null : await response.json().catch(() => null)
@@ -81,4 +82,5 @@ export async function apiRequest<T>(
   return schema.parse(data)
 }
 
-export const apiGet = <T>(path: string, schema: z.ZodType<T>) => apiRequest('GET', path, schema)
+export const apiGet = <T>(path: string, schema: z.ZodType<T>, signal?: AbortSignal) =>
+  apiRequest('GET', path, schema, undefined, { signal })

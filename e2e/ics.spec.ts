@@ -233,7 +233,9 @@ test.describe('6.9 Import d’un agenda par lien (ICS)', () => {
 
     await page.getByRole('tab', { name: 'Calendrier' }).click()
     await calendars.getByRole('button', { name: 'Options de l’agenda Agenda du quartier' }).click()
-    await page.getByRole('menuitem', { name: 'Supprimer l’agenda' }).click()
+    // Au clavier : sous WebKit, le menu bouge parfois encore au moment du clic.
+    await page.getByRole('menuitem', { name: 'Supprimer l’agenda' }).focus()
+    await page.keyboard.press('Enter')
     await expect(page.getByRole('alertdialog')).toContainText(
       '7 événements importés vont à la corbeille',
     )

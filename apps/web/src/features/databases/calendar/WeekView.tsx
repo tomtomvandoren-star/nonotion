@@ -41,8 +41,13 @@ export function WeekView({
   onCreate,
   onDragStart,
   creating,
-}: GridProps & { creating: { start: Date; end: Date } | null }) {
-  const days = weekDays(anchor)
+  single = false,
+}: GridProps & {
+  creating: { start: Date; end: Date } | null
+  /** La vue Jour : une seule colonne, la journée de `anchor`. */
+  single?: boolean
+}) {
+  const days = single ? [anchor] : weekDays(anchor)
   const band = layoutRow(
     items.filter((item) => !onGrid(item)),
     days,
@@ -56,11 +61,12 @@ export function WeekView({
     if (scroller.current) scroller.current.scrollTop = 7 * HOUR_HEIGHT
   }, [])
 
-  const columns = 'grid grid-cols-[3rem_repeat(7,minmax(0,1fr))]'
+  const columns = 'grid'
+  const columnTemplate = { gridTemplateColumns: `3rem repeat(${days.length}, minmax(0, 1fr))` }
 
   return (
     <div className="border-t border-border text-sm">
-      <div className={columns}>
+      <div className={columns} style={columnTemplate}>
         <div className="border-b border-border" />
         {days.map((day) => (
           <div
@@ -94,7 +100,7 @@ export function WeekView({
       </div>
 
       {/* Bandeau des journées entières et des plages : les cases reçoivent les éléments glissés. */}
-      <div className={cn(columns, 'relative')}>
+      <div className={cn(columns, 'relative')} style={columnTemplate}>
         <div className="flex items-center justify-end border-b border-border pr-1 text-[10px] text-muted-foreground">
           jour
         </div>
@@ -107,8 +113,11 @@ export function WeekView({
           />
         ))}
         <div
-          className="pointer-events-none absolute inset-y-0 right-0 left-12 grid grid-cols-7 gap-y-0.5 py-0.5"
-          style={{ gridTemplateRows: `repeat(${lanes}, 22px)` }}
+          className="pointer-events-none absolute inset-y-0 right-0 left-12 grid gap-y-0.5 py-0.5"
+          style={{
+            gridTemplateRows: `repeat(${lanes}, 22px)`,
+            gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))`,
+          }}
         >
           {band.map((segment) => (
             <ItemPill
@@ -131,7 +140,7 @@ export function WeekView({
       </div>
 
       <div ref={scroller} data-calendar-scroll className="max-h-[560px] overflow-y-auto">
-        <div className={columns}>
+        <div className={columns} style={columnTemplate}>
           <div>
             {HOURS.map((hour) => (
               <div

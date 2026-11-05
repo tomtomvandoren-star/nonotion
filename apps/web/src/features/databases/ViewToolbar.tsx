@@ -47,7 +47,7 @@ import { newRule, OPERATOR_LABELS, RELATIVE_DATE_LABELS, withOperator } from './
 import { PropertyIcon } from './propertyDisplay'
 
 const toolButton =
-  'flex h-7 items-center gap-1 rounded-sm px-2 text-sm text-muted-foreground hover:bg-accent data-[active=true]:bg-primary/10 data-[active=true]:text-primary'
+  'flex h-7 items-center gap-1 rounded-sm px-2 text-sm text-muted-foreground hover:bg-accent data-[active=true]:bg-primary/10 data-[active=true]:text-primary touch:h-10'
 const selectClass =
   'h-7 min-w-0 rounded-sm border border-border bg-background px-1.5 text-sm outline-none focus-visible:border-primary'
 

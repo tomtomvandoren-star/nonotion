@@ -1,4 +1,5 @@
 import {
+  type CalendarMode,
   type DatabaseDetail,
   type DatabaseRowData,
   type DateValue,
@@ -270,9 +271,10 @@ const longFormat = new Intl.DateTimeFormat('fr-FR', {
   year: 'numeric',
 })
 
-/** « novembre 2026 », ou pour une semaine « 2 – 8 nov. 2026 ». */
-export function periodLabel(mode: 'month' | 'week', anchor: Day): string {
+/** « novembre 2026 », pour une semaine « 2 – 8 nov. 2026 », pour un jour « jeudi 5 novembre 2026 ». */
+export function periodLabel(mode: CalendarMode, anchor: Day): string {
   if (mode === 'month') return monthFormat.format(parseDay(anchor))
+  if (mode === 'day') return dayLabel(anchor)
   const days = weekDays(anchor)
   const first = parseDay(days[0]!)
   const last = parseDay(days[6]!)
@@ -280,4 +282,12 @@ export function periodLabel(mode: 'month' | 'week', anchor: Day): string {
 }
 
 /** « jeudi 5 novembre 2026 ». */
-export const dayLabel = (day: Day) => longFormat.format(parseDay(day))
+export function dayLabel(day: Day): string {
+  return longFormat.format(parseDay(day))
+}
+
+/** Les jours qu'affiche un calendrier : le mois (semaines entières), la semaine ou le jour. */
+export function visibleDays(mode: CalendarMode, anchor: Day): Day[] {
+  if (mode === 'day') return [anchor]
+  return mode === 'week' ? weekDays(anchor) : monthWeeks(anchor).flat()
+}
