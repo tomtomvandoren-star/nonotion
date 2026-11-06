@@ -1,6 +1,6 @@
 # Mobile (Capacitor)
 
-Emballage Capacitor du front `apps/web` pour iOS et Android : phase 9.
+Emballage Capacitor du front `apps/web` pour iOS et Android : phase 10.
 
 ## Test précoce de la phase 2 : l'éditeur sur un vrai téléphone Android
 
@@ -10,7 +10,7 @@ web Android (spec 9).
 
 L'APK est construit par GitHub Actions (workflow « Builds natifs de test »), car il faut Java 21 et
 le SDK Android. Le projet Android (`android/`) y est généré par `cap add android` ; il sera versionné
-en phase 9, quand l'application complète sera emballée.
+en phase 10, quand l'application complète sera emballée.
 
 Pour le construire soi-même (Java 21 et SDK Android installés) :
 

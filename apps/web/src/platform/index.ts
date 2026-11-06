@@ -13,7 +13,7 @@ export interface AppUpdate {
 /**
  * Ce qui diffère entre le web, Tauri et Capacitor (spec 1.6.2). Le reste du code passe
  * toujours par `platform` et n'importe jamais @tauri-apps/* ni @capacitor/*.
- * Web et Tauri (phase 8) existent ; Capacitor arrive en phase 9.
+ * Web et Tauri (phase 8) existent ; Capacitor arrive en phase 10.
  */
 export interface Platform {
   /** Le site dans un navigateur, ou l'application pour ordinateur (Tauri). */

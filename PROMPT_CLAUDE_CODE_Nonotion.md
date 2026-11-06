@@ -94,8 +94,8 @@ L'application doit fonctionner sur **web, Windows, macOS, Linux, iOS et Android*
 | Windows | Tauri 2 (`.msi` / `.exe`) | 8 | Signature de code conseillée, sinon avertissement SmartScreen |
 | macOS | Tauri 2 (`.dmg`) | 8 | Signature et notarisation Apple (compte développeur payant), idéalement construit sur un Mac |
 | Linux | Tauri 2 (AppImage, `.deb`, Flatpak) | 8 | Utilise WebKitGTK : tester tôt |
-| iOS | Capacitor | 9 | Il faut un **Mac avec Xcode** et un compte Apple Developer (environ 99 $/an) pour tester sur un vrai iPhone et publier |
-| Android | Capacitor | 9 | Android Studio ; compte Google Play (environ 25 $, une fois) pour publier ; un APK peut être installé directement pour les tests |
+| iOS | Capacitor | 10 | Il faut un **Mac avec Xcode** et un compte Apple Developer (environ 99 $/an) pour tester sur un vrai iPhone et publier |
+| Android | Capacitor | 10 | Android Studio ; compte Google Play (environ 25 $, une fois) pour publier ; un APK peut être installé directement pour les tests |
 
 Les installateurs desktop peuvent être mis en téléchargement dans `/downloads/` sur l'hébergement, avec le petit fichier JSON utilisé par la mise à jour automatique de Tauri.
 
@@ -103,7 +103,7 @@ Les installateurs desktop peuvent être mis en téléchargement dans `/downloads
 
 1. **Front sans serveur.** Tout appel au backend passe par un module unique (`apps/web/src/lib/api/`) qui lit l'adresse de l'API dans une variable d'environnement (`VITE_API_URL`). Les applications natives l'utilisent telle quelle.
 2. **Couche `platform/`.** Une interface TypeScript `Platform` (ouvrir un lien externe, partager, notifier, choisir un fichier, stockage sécurisé, `isMac`, `isTouch`) avec trois implémentations (web, Tauri, Capacitor) choisies au démarrage. Le reste du code n'importe **jamais** `@tauri-apps/*` ni `@capacitor/*` directement.
-3. **Authentification simple d'abord** : e-mail + mot de passe. Les connexions « Se connecter avec Google » demandent des liens profonds propres à chaque plateforme : phases 8 et 9, pas avant.
+3. **Authentification simple d'abord** : e-mail + mot de passe. Les connexions « Se connecter avec Google » demandent des liens profonds propres à chaque plateforme : phases 8 et 10, pas avant.
 4. **Aucun contrôle ne dépend du survol.** Tout élément « visible au survol » (principe P2) doit aussi être accessible sur écran tactile via `@media (pointer: coarse)`. Cibles tactiles d'au moins 44 px.
 5. **Zones sûres et hauteurs** : `env(safe-area-inset-*)`, `100dvh`, `viewport-fit=cover`.
 6. **Raccourcis** : `Cmd` sur macOS, `Ctrl` ailleurs, décidés à un seul endroit (`isMac`).
@@ -197,7 +197,7 @@ Cible : usage personnel d'abord (un seul utilisateur), mais avec compte et donn�
 users(id, name, email UNIQUE, password, created_at, updated_at)     -- table Laravel standard
 personal_access_tokens(...)                                         -- jetons Sanctum
 workspaces(id, name, owner_id, created_at)
-workspace_members(workspace_id, user_id, role)   -- un seul membre au départ ; prévu pour le partage (phase 10)
+workspace_members(workspace_id, user_id, role)   -- un seul membre au départ ; prévu pour le partage (phase 11)
 
 pages(
   id, workspace_id,
@@ -462,6 +462,92 @@ Vues fournies d'office : **Tableau** (toutes), **Aujourd'hui** (filtre Échéanc
 `Ctrl` sur Windows/Linux, `Cmd` sur macOS (décidé à un seul endroit, voir 1.6). Sur mobile : pas de raccourcis, chaque action doit avoir un équivalent tactile.
 `/` menu blocs · Ctrl+K recherche · Ctrl+N nouvelle page · Ctrl+\ masquer sidebar · Ctrl+Z / Ctrl+Maj+Z annuler/rétablir · Tab / Maj+Tab indenter · Échap sélectionner le bloc · Ctrl+/ aide des raccourcis. Dans le calendrier : `D` jour, `W` semaine, `M` mois, `T` aujourd'hui.
 
+### 6.15 Agenda unifié et synchronisation (Nonotion, ICS, Google, iCloud) : phase 9
+
+**Cahier des charges fourni** (texte d'origine, chaque « Notion » remplacé par « Nonotion ») :
+
+```markdown
+# Role & Context
+You are an expert full-stack systems architect and UI/UX designer. Your task is to expand an existing productivity application's calendar module to support multi-source data ingestion and synchronization:
+1. **Nonotion Tasks-to-Calendar Sync:** Importing dated database items from Nonotion pages into the core calendar grid.
+2. **ICS File/URL Subscriptions:** Parsing and rendering external `.ics` calendar feeds.
+3. **External Account Integration (Google / Apple):** Supporting both direct OAuth bidirectional sync and ICS fallback links.
+
+Below is the detailed technical specification and UX intent required for implementation.
+
+---
+
+## Module 1: Nonotion Database Task Sync
+- **Backend Sync Engine:** Implement a polling or webhook listener connected to the Nonotion API to fetch pages/database items containing date properties.
+- **UI Mapping & Rendering:**
+  - Provide a settings interface where users can select specific Nonotion databases to sync.
+  - Render Nonotion tasks on the calendar grid with a distinct visual tag (e.g., a small Nonotion icon badge) to differentiate them from standard meetings.
+  - Support inline status toggling (e.g., checking off a task in the calendar updates its status/checkbox in Nonotion instantly).
+
+## Module 2: ICS Feed Import & Management
+- **Parser Implementation:** Build a robust `.ics` parser (handling recurring events, timezones, and summary/description fields) that takes a remote URL input.
+- **Caching & Refresh Strategy:** Schedule periodic background background jobs to re-fetch and update ICS feeds without blocking the main UI thread.
+- **UI Integration:** Add a "Subscribed Calendars" section in the settings sidebar allowing users to add, color-code, or toggle the visibility of external ICS feeds.
+
+## Module 3: Google & Apple Calendar Integration (OAuth & ICS)
+- **Dual-Path Connection Flow:**
+  - *Path A (OAuth 2.0 / CalDAV):* Establish direct bidirectional sync with Google Calendar and Apple (iCloud) accounts. Handle token refreshes and real-time event updates.
+  - *Path B (ICS Alternative):* Allow users to paste a private calendar link (e.g., Apple iCloud webcal link) for read-only ingestion.
+- **Unified Grid View:** Ensure the calendar state manager merges events from local sources, Nonotion, ICS feeds, and external accounts smoothly, resolving overlapping conflicts gracefully.
+
+---
+
+## Deliverables Expected
+1. **Data Schema & State Architecture:** Database models and state management logic to handle multi-source event synchronization.
+2. **API Integration Services:** Modular service layers for Nonotion API, ICS parsing, and Google/Apple calendar connectors.
+3. **UI Components:** Settings views for managing integrations, visual badge indicators for event sources, and unified calendar grid rendering.
+```
+
+**Mise en œuvre dans Nonotion** (proposée par Claude Code au moment d'ajouter la phase, à valider au début de la phase 9) :
+
+- **Rôle** : voir **toute sa semaine au même endroit** : les tâches et éléments datés de ses bases Nonotion, les agendas abonnés par lien, et ses agendas Google et iCloud, modifiables d'un côté comme de l'autre.
+- **Ce que « Nonotion » veut dire ici** : les bases de Nonotion sont déjà dans notre API ; il n'y a donc pas de service extérieur à interroger pour le module 1. Le « moteur de synchronisation » rassemble les lignes datées des bases choisies (`GET /api/workspaces/{id}/agenda?from=…&to=…`), rafraîchi comme le reste (spec 1.3.6 : toutes les 60 s quand l'application est visible, et à l'ouverture).
+- **Emplacement** : une page **« Agenda »** de l'espace de travail, entrée fixe de la barre latérale (sous « Accueil »), adresse `/agenda`. Même grille que la vue Calendrier d'une base (6.8 : mois, semaine, jour, raccourcis D W M T, glisser-déposer), mais nourrie par plusieurs sources. Les vues Calendrier de chaque base restent ce qu'elles sont.
+- **Réglages « Mes agendas »** (panneau gauche de l'Agenda, repliable ; sur téléphone, sous la grille), en trois groupes, chacun avec case « afficher » et pastille de couleur :
+  1. **Bases Nonotion** : chaque base qui a une propriété Date ; on coche celles à afficher.
+  2. **Agendas abonnés (ICS)** : ajouter (le panneau de 6.9), couleur, afficher/masquer, resynchroniser, supprimer : la gestion de 6.9, à l'échelle de l'espace de travail.
+  3. **Comptes connectés** : « Connecter Google Agenda », « Connecter iCloud » ; pour chaque compte, ses agendas (lesquels synchroniser, couleur, base où ranger les événements), l'état (« Synchronisé il y a 2 min », erreur claire), « Déconnecter ».
+- **Pastille de source** : chaque élément de la grille porte une petite icône : Nonotion (l'icône de l'application) pour une ligne de base, lien pour un agenda ICS, Google, iCloud ; au survol, le nom de la base ou de l'agenda. Intention : savoir d'un coup d'œil d'où vient un élément, sans lire.
+- **Case de statut dans la grille** : un élément d'une base qui a un Statut ou une Case à cocher montre une case ; la cocher le passe dans le groupe « Terminé » (ou coche la case), tout de suite à l'écran (mise à jour optimiste), avec la répétition de 6.7 (la fois suivante est créée). Intention : traiter sa journée depuis l'Agenda, sans ouvrir chaque tâche.
+- **Chevauchements** : en Semaine et Jour, deux éléments qui se recouvrent s'affichent **côte à côte** (colonnes réparties), jamais l'un sur l'autre ; en Mois, ordre stable (journées entières, puis par heure, puis par source) et « +N » quand la case est pleine. Le **même** événement venu de deux sources (par exemple Google et son lien ICS) est reconnu à son UID iCalendar et n'apparaît qu'une fois.
+- **Où vivent les événements Google et iCloud** : comme ceux d'un ICS (6.9), ce sont des **lignes d'une base** (P1 : un événement est une page), choisie à la connexion (« Nouvelle base d'événements » par défaut). Ils profitent de tout le reste : vues, recherche, propriétés à soi (notes, étiquettes) qui ne partent pas chez Google.
+- **Modèle de données** (migrations) :
+  - `calendar_accounts(id, workspace_id, provider 'google'|'icloud', account_email, credentials_encrypted, status, error_message, last_sync_at)` : pour Google, le jeton de rafraîchissement ; pour iCloud, l'identifiant Apple et le mot de passe pour application. Chiffrés avec `Crypt` (APP_KEY), jamais renvoyés au client ni journalisés.
+  - `calendar_sources` gagne `kind` ('ics'|'google'|'icloud'), `account_id`, `remote_id` (identifiant d'agenda Google, adresse CalDAV), `sync_token`, `writable`, `push_channel_id`, `push_expires_at`.
+  - `pages` gagne, pour les événements synchronisés, `remote_href` (CalDAV), `remote_etag`, `remote_updated_at` : ce qu'on sait de la version distante.
+  - `workspaces.agenda` (JSON) : les bases affichées dans l'Agenda, leurs couleurs, les agendas masqués.
+- **Services de l'API, un par source** : une interface `CalendarConnector` (`listCalendars`, `pullChanges`, `pushEvent`, `deleteEvent`) et trois implémentations : `IcsConnector` (l'existant de 6.9, lecture seule), `GoogleConnector` (API Google Calendar v3 : `events.list` avec `syncToken`, `insert`, `patch`, `delete`, `watch`), `CalDavConnector` (iCloud : `PROPFIND`, `REPORT sync-collection` (RFC 6578), `PUT` et `DELETE` avec `If-Match`). Un moteur commun (`CalendarSync`) fait l'upsert, les suppressions et les conflits, pour les trois.
+- **Connexion des comptes (chemin A)** :
+  - **Google** : OAuth 2.0 côté serveur (flux « code d'autorisation », client confidentiel). « Connecter Google Agenda » ouvre la page de Google (dans le navigateur du système pour l'application de bureau) ; le retour arrive sur l'API (`/api/integrations/google/callback`), qui garde le jeton chiffré ; l'application voit le compte apparaître. Portées : `calendar.events` et `calendar.calendarlist.readonly`. Le jeton d'accès (1 h) est rafraîchi tout seul ; un jeton refusé met le compte en erreur avec « Reconnecter ».
+  - **iCloud** : Apple n'a pas d'OAuth pour l'agenda ; CalDAV (`caldav.icloud.com`) avec l'identifiant Apple et un **mot de passe pour application** (créé sur account.apple.com, double authentification obligatoire), tapé par l'utilisateur dans Nonotion. Un refus (401) dit : « Ce mot de passe pour application a été révoqué (il l'est aussi quand on change le mot de passe de l'identifiant Apple) ».
+  - **Chemin B (ICS)** : inchangé (6.9), en lecture seule.
+- **Synchronisation dans les deux sens** :
+  - **De Google ou iCloud vers Nonotion** : changements incrémentaux seulement (`syncToken` de Google, `sync-token` CalDAV), par lots, avec reprise. Déclencheurs : à l'ouverture de l'Agenda (si plus de 2 min), le webcron (15 min), « Resynchroniser », et pour Google les **notifications** (`POST /api/webhooks/google`, vérifiées par le jeton du canal, renouvelées avant expiration) si Google les accepte pour le domaine ; sinon, les autres déclencheurs suffisent.
+  - **De Nonotion vers Google ou iCloud** : une modification d'un événement synchronisé (titre, dates, lieu, description) part juste après la réponse au navigateur (`afterResponse` de Laravel : pas de file d'attente permanente sur l'hébergement mutualisé), avec `If-Match` (ETag). Un élément créé dans la base d'un agenda, ou dans l'Agenda sur cet agenda, est créé chez Google ou Apple. Mis à la corbeille : supprimé chez eux ; restauré : recréé.
+  - **Conflit** (modifié des deux côtés depuis la dernière synchronisation) : la version la plus récente gagne ; l'autre reste dans l'historique de la page (6.13) et un avertissement discret le signale. Jamais de doublon : clé (agenda, UID, RECURRENCE-ID), comme en 6.9.
+  - **Récurrences** : une occurrence modifiée dans Nonotion devient une exception de la série (instance Google, `RECURRENCE-ID` CalDAV). Modifier toute la série se fait chez Google ou Apple (première version). Une tâche qui se répète à la manière de 6.7 part comme des événements simples, une fois après l'autre.
+- **Sécurité** : jetons et mots de passe chiffrés (la sauvegarde d'APP_KEY devient indispensable : sans elle, il faut reconnecter les comptes) ; seuls les hôtes de Google et d'iCloud sont joints pour ces comptes ; déconnecter révoque le jeton chez Google et efface les identifiants ; isolation par espace de travail et test qui le prouve ; journaux sans aucun secret.
+- **Prérequis de ton côté** (aucun ne peut être fait à ta place) :
+  1. Un projet Google Cloud (gratuit) avec l'API Google Calendar activée et un écran de consentement « Externe » **publié en production**. En « Test », Google fait expirer les jetons au bout de 7 jours. Tant que Google n'a pas validé l'application, sa page de connexion avertit (« Google n'a pas validé cette application » ; on continue par « Paramètres avancés ») et la limite est de 100 utilisateurs : sans importance pour un usage personnel. La validation pourra se faire plus tard (page d'accueil, politique de confidentialité).
+  2. Des identifiants OAuth « Application Web » avec l'adresse de retour `https://nonotion.thomasvandoren.be/api/integrations/google/callback` ; `GOOGLE_CLIENT_ID` et `GOOGLE_CLIENT_SECRET` dans le `.env` du serveur (tu l'édites toi-même).
+  3. Peut-être, pour les notifications instantanées, la validation du domaine dans Google Search Console (à confirmer en début de phase).
+  4. iCloud : rien à préparer ; un mot de passe pour application au moment de connecter.
+- **Critères d'acceptation** (Google et iCloud sont testés contre de faux serveurs dans les tests automatiques ; le dernier critère se fait avec tes vrais comptes) :
+  - L'Agenda montre les éléments datés des bases cochées, avec leur pastille Nonotion ; décocher une base les retire ; recharger garde le choix.
+  - Cocher la case d'une tâche dans l'Agenda la passe à « Terminé » et crée la fois suivante si elle se répète ; recharger : c'est gardé.
+  - Un agenda ICS ajouté depuis « Mes agendas » apparaît avec sa couleur ; le masquer le cache ; changer sa couleur la change partout.
+  - Google : connecter, choisir un agenda, ses événements apparaissent ; modifier un événement dans Nonotion le modifie chez Google ; le modifier chez Google le met à jour dans Nonotion sans doublon ; créer et supprimer dans Nonotion crée et supprime chez Google ; un jeton expiré est rafraîchi, un jeton révoqué demande de reconnecter.
+  - iCloud : les mêmes parcours ; un mot de passe refusé donne un message clair.
+  - Modifié des deux côtés : la version la plus récente gagne, l'autre est dans l'historique.
+  - En Semaine, deux éléments qui se recouvrent sont côte à côte ; le même événement venu de deux sources n'apparaît qu'une fois.
+  - Un autre utilisateur ne voit ni les comptes ni les événements ; aucune réponse de l'API ne contient de jeton ou de mot de passe.
+  - Avec tes vrais comptes : Google Agenda et iCloud connectés, un événement créé de chaque côté apparaît de l'autre.
+
 ---
 
 ## 7. Design system
@@ -513,10 +599,11 @@ Sous ~768 px : la sidebar devient un tiroir ; les contrôles « au survol » dev
 | **6** | **Import ICS** (prévisualisation, import, abonnement, resynchronisation, récurrences, SSRF, chiffrement, cron et synchronisation à l'ouverture) | Critères 6.9 validés |
 | **7** | Recherche Ctrl+K, raccourcis, thème sombre, responsive | 6.12 et 6.14 validés |
 | **8** | **Applications desktop** : emballage Tauri 2 (Windows, macOS, Linux), couche `platform/`, mises à jour, signature | Application installable et fonctionnelle sur les 3 systèmes |
-| **9** | **Applications mobiles** : emballage Capacitor (iOS, Android), interface tactile (appui long, zones sûres), notifications de rappel des tâches | Application installée sur un vrai téléphone, parcours complet validé |
-| **10** | (Plus tard) Hors-ligne, relations/rollups/formules, partage et permissions, commentaires, export flux ICS d'une base ; le temps réel collaboratif demandera un serveur hors hébergement mutualisé | À définir ensemble |
+| **9** | **Agenda unifié et synchronisation** : page Agenda de l'espace (bases Nonotion, agendas ICS, Google, iCloud), « Mes agendas », pastilles de source, case de statut, synchronisation dans les deux sens avec Google (OAuth 2.0) et iCloud (CalDAV), conflits, chevauchements | Critères 6.15 validés |
+| **10** | **Applications mobiles** : emballage Capacitor (iOS, Android), interface tactile (appui long, zones sûres), notifications de rappel des tâches | Application installée sur un vrai téléphone, parcours complet validé |
+| **11** | (Plus tard) Hors-ligne, relations/rollups/formules, partage et permissions, commentaires, export flux ICS d'une base ; le temps réel collaboratif demandera un serveur hors hébergement mutualisé | À définir ensemble |
 
-**Test précoce obligatoire** : à la fin de la phase 2, construis un **build Capacitor minimal** contenant seulement l'éditeur et installe-le sur un vrai téléphone, pour détecter tôt les problèmes de clavier et de sélection de texte. Fais pareil sur Linux avec Tauri. Ne découvre pas ces problèmes en phase 9.
+**Test précoce obligatoire** : à la fin de la phase 2, construis un **build Capacitor minimal** contenant seulement l'éditeur et installe-le sur un vrai téléphone, pour détecter tôt les problèmes de clavier et de sélection de texte. Fais pareil sur Linux avec Tauri. Ne découvre pas ces problèmes en phase 10.
 
 ---
 

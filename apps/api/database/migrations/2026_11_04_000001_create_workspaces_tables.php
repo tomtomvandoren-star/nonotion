@@ -15,7 +15,7 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        // Un seul membre au départ ; la table prépare le partage (phase 10).
+        // Un seul membre au départ ; la table prépare le partage (phase 11).
         Schema::create('workspace_members', function (Blueprint $table) {
             $table->foreignUlid('workspace_id')->constrained()->cascadeOnDelete();
             $table->foreignUlid('user_id')->constrained()->cascadeOnDelete();

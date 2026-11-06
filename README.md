@@ -11,7 +11,7 @@ techniques dans [DECISIONS.md](DECISIONS.md).
 apps/web/         front React + Vite (SPA, plus tard PWA, Tauri et Capacitor)
 apps/api/         API Laravel 13 + MariaDB
 apps/desktop/     Tauri 2 (phase 8 ; pour l'instant, le bac à sable de l'éditeur)
-apps/mobile/      Capacitor (phase 9 ; pour l'instant, le bac à sable de l'éditeur)
+apps/mobile/      Capacitor (phase 10 ; pour l'instant, le bac à sable de l'éditeur)
 packages/shared/  code TypeScript partagé (schémas Zod, moteur de vues)
 e2e/              tests Playwright (Chromium, Firefox, WebKit)
 deploy.sh         déploiement sur l'hébergement Infomaniak
