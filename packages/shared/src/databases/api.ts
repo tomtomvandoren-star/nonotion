@@ -13,6 +13,8 @@ export const databaseRowSchema = z.object({
   position: z.string(),
   /** Un événement importé d'un agenda (spec 6.9) : titre et date en lecture seule. */
   calendar_source_id: z.string().nullable().optional(),
+  /** Son UID iCalendar : l'Agenda (spec 6.15) n'affiche qu'une fois un événement présent dans deux agendas. */
+  ics_uid: z.string().nullable().optional(),
   created_at: isoDate.nullable(),
   updated_at: isoDate.nullable(),
 })
@@ -78,7 +80,40 @@ export const databaseDetailSchema = z.object({
   feed_url: z.string().nullable().optional(),
 })
 
+/**
+ * Les réglages de la page « Agenda » de l'espace (spec 6.15). On retient ce qui est masqué : une
+ * nouvelle base, un nouvel agenda apparaissent d'eux-mêmes.
+ */
+export const agendaSettingsSchema = z.object({
+  /** Les bases dont les éléments propres ne s'affichent pas. */
+  hidden_databases: z.array(z.string()),
+  /** Les agendas (ICS, Google, iCloud) masqués. */
+  hidden_sources: z.array(z.string()),
+  /** La couleur des éléments d'une base ; sans couleur, celle du thème. */
+  colors: z.record(z.string(), z.enum(OPTION_COLORS)),
+  /** La base des éléments créés depuis l'Agenda ; sinon la première affichée. */
+  default_database_id: z.string().nullable(),
+})
+
+export const agendaSchema = z.object({
+  settings: agendaSettingsSchema,
+  /** Les bases de l'espace qui ont une Date, avec celle qui place leurs éléments. */
+  databases: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string(),
+      page_id: z.string(),
+      date_property: z.string(),
+      /** Une base créée pour un import, qui ne contient que ses événements : montrée par ses agendas. */
+      imported_only: z.boolean(),
+    }),
+  ),
+  sources: z.array(calendarSourceSchema),
+})
+
 export type DatabaseRowData = z.infer<typeof databaseRowSchema>
+export type Agenda = z.infer<typeof agendaSchema>
+export type AgendaSettings = z.infer<typeof agendaSettingsSchema>
 export type DatabaseView = z.infer<typeof databaseViewSchema>
 export type DatabaseDetail = z.infer<typeof databaseDetailSchema>
 export type CalendarSource = z.infer<typeof calendarSourceSchema>

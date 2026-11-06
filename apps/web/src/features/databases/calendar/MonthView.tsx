@@ -1,9 +1,9 @@
 import { Plus } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
-import type { Completion } from '../completion'
 import { type CalendarItem, type Day, dayLabel, layoutRow, monthWeeks, overlaps } from './dates'
 import { ItemPill } from './ItemPill'
+import type { ItemLook } from './look'
 import type { DragStart } from './useCalendarDrag'
 
 /** Lignes d'éléments visibles dans une case ; au-delà, « +3 autres ». */
@@ -14,9 +14,8 @@ export type GridProps = {
   anchor: Day
   today: Day
   items: CalendarItem[]
-  completion: Completion | null
-  /** La couleur de l'agenda importé d'un élément (null : un élément de la base). */
-  colorOf: (item: CalendarItem) => string | null
+  /** Couleur, verrou (événement importé), case « fait », source : comment montrer chaque élément. */
+  lookOf: (item: CalendarItem) => ItemLook
   onOpen: (rowId: string) => void
   onCreate: (day: Day) => void
   onDragStart: (event: React.PointerEvent, what: DragStart) => void
@@ -59,8 +58,7 @@ function MonthWeek({
   month,
   today,
   items,
-  completion,
-  colorOf,
+  lookOf,
   onOpen,
   onCreate,
   onDragStart,
@@ -109,8 +107,7 @@ function MonthWeek({
                 day={day}
                 count={hidden}
                 items={items.filter((item) => overlaps(item, day, day))}
-                completion={completion}
-                colorOf={colorOf}
+                lookOf={lookOf}
                 onOpen={onOpen}
               />
             )}
@@ -125,12 +122,11 @@ function MonthWeek({
           <ItemPill
             key={segment.item.key}
             item={segment.item}
-            completion={completion}
+            look={lookOf(segment.item)}
             continuesBefore={segment.continuesBefore}
             continuesAfter={segment.continuesAfter}
-            color={colorOf(segment.item)}
             onOpen={() => onOpen(segment.item.row.id)}
-            onDragStart={colorOf(segment.item) ? undefined : onDragStart}
+            onDragStart={onDragStart}
             className="pointer-events-auto mx-px"
             style={{
               gridColumn: `${segment.startCol + 1} / ${segment.endCol + 2}`,
@@ -148,15 +144,13 @@ function MoreItems({
   day,
   count,
   items,
-  completion,
-  colorOf,
+  lookOf,
   onOpen,
 }: {
   day: Day
   count: number
   items: CalendarItem[]
-  completion: Completion | null
-  colorOf: (item: CalendarItem) => string | null
+  lookOf: (item: CalendarItem) => ItemLook
   onOpen: (rowId: string) => void
 }) {
   return (
@@ -178,8 +172,7 @@ function MoreItems({
             <ItemPill
               key={item.key}
               item={item}
-              completion={completion}
-              color={colorOf(item)}
+              look={lookOf(item)}
               onOpen={() => onOpen(item.row.id)}
             />
           ))}

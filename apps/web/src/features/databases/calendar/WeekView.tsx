@@ -16,7 +16,9 @@ import {
   timeOf,
   weekDays,
 } from './dates'
-import { ItemPill } from './ItemPill'
+import { DoneBox, ItemPill } from './ItemPill'
+import { itemLabel } from './look'
+import { SourceBadge } from './SourceBadge'
 import type { GridProps } from './MonthView'
 import { HOUR_HEIGHT, PX_PER_MINUTE } from './useCalendarDrag'
 
@@ -35,8 +37,7 @@ export function WeekView({
   anchor,
   today,
   items,
-  completion,
-  colorOf,
+  lookOf,
   onOpen,
   onCreate,
   onDragStart,
@@ -123,12 +124,11 @@ export function WeekView({
             <ItemPill
               key={segment.item.key}
               item={segment.item}
-              completion={completion}
+              look={lookOf(segment.item)}
               continuesBefore={segment.continuesBefore}
               continuesAfter={segment.continuesAfter}
-              color={colorOf(segment.item)}
               onOpen={() => onOpen(segment.item.row.id)}
-              onDragStart={colorOf(segment.item) ? undefined : onDragStart}
+              onDragStart={onDragStart}
               className="pointer-events-auto mx-px"
               style={{
                 gridColumn: `${segment.startCol + 1} / ${segment.endCol + 2}`,
@@ -160,8 +160,7 @@ export function WeekView({
               now={now}
               items={items.filter((item) => onGrid(item) && overlaps(item, day, day))}
               creating={creating && dayOf(creating.start) === day ? creating : null}
-              completion={completion}
-              colorOf={colorOf}
+              lookOf={lookOf}
               onOpen={onOpen}
               onDragStart={onDragStart}
             />
@@ -178,11 +177,10 @@ function DayColumn({
   now,
   items,
   creating,
-  completion,
-  colorOf,
+  lookOf,
   onOpen,
   onDragStart,
-}: Pick<GridProps, 'completion' | 'colorOf' | 'onOpen' | 'onDragStart'> & {
+}: Pick<GridProps, 'lookOf' | 'onOpen' | 'onDragStart'> & {
   day: string
   isToday: boolean
   now: Date
@@ -221,11 +219,15 @@ function DayColumn({
       }}
     >
       {events.map(({ item, top, bottom, col, cols }) => {
-        const color = colorOf(item)
+        const look = lookOf(item)
+        const { color } = look
+        // Un événement importé garde ses heures (elles viennent de l'agenda d'origine) ; une
+        // répétition à venir n'existe pas encore.
+        const fixed = look.locked || item.ghost
         return (
           <div
             key={item.key}
-            data-done={completion?.isDone(item.row) || undefined}
+            data-done={look.completion?.isDone(item.row) || undefined}
             className="group/event absolute px-px"
             style={{
               top: top * PX_PER_MINUTE,
@@ -240,13 +242,11 @@ function DayColumn({
                 ? { 'data-calendar-occurrence': item.row.id }
                 : { 'data-calendar-item': item.row.id })}
               data-day-start={item.startDay}
-              aria-label={`${displayTitle(item.row.title)}, ${timeOf(item.start!)}`}
+              aria-label={itemLabel(item, look, timeOf(item.start!))}
               data-color={color ?? undefined}
               onClick={() => onOpen(item.row.id)}
               onPointerDown={(event) =>
-                // Un événement importé garde ses heures (elles viennent de l'agenda d'origine) ;
-                // une répétition à venir n'existe pas encore.
-                color || item.ghost
+                fixed
                   ? undefined
                   : onDragStart(event, {
                       kind: 'move',
@@ -265,16 +265,20 @@ function DayColumn({
                 item.ghost && 'border border-dashed opacity-60',
               )}
             >
-              <span className="nn-task-title truncate font-medium">
-                {displayTitle(item.row.title)}
+              <span className="flex min-w-0 items-center gap-1">
+                {look.source && <SourceBadge source={look.source} />}
+                <span className="nn-task-title truncate font-medium">
+                  {displayTitle(item.row.title)}
+                </span>
               </span>
               <span className="truncate text-muted-foreground tabular-nums">
                 {timeOf(item.start!)}
                 {item.end && item.end > item.start! && ` – ${timeOf(item.end)}`}
               </span>
             </button>
+            <DoneBox item={item} look={look} className="absolute top-0.5 right-1" />
             {/* Tirer le bord du bas change la fin (spec 6.8). */}
-            {!color && !item.ghost && (
+            {!fixed && (
               <span
                 aria-hidden
                 onPointerDown={(event) =>

@@ -26,9 +26,13 @@ export type ImportInput = {
   name: string
   color: OptionColor
   mode: 'subscription' | 'one_shot'
-  /** Une base existante, ou une nouvelle base d'événements créée sous cette page. */
+  /**
+   * Une base existante, ou une nouvelle base d'événements créée sous cette page, ou au premier
+   * niveau de cet espace de travail (depuis l'Agenda, spec 6.15).
+   */
   database_id?: string
   page_id?: string
+  workspace_id?: string
   time_zone: string
 }
 

@@ -24,6 +24,7 @@ import {
   type DateProperty,
   visibleDays,
 } from './dates'
+import { plainLook } from './look'
 import { MonthView } from './MonthView'
 import { MyCalendars } from './MyCalendars'
 import { type DragStart, useCalendarDrag } from './useCalendarDrag'
@@ -151,8 +152,7 @@ function Calendar({
     anchor,
     today,
     items: dated,
-    completion,
-    colorOf,
+    lookOf: (item: CalendarItem) => plainLook(colorOf(item), completion),
     onOpen: open,
     onCreate,
     onDragStart: drag.start,

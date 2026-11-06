@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import {
+  CalendarDays,
   ChevronsLeft,
   Download,
   Home,
@@ -91,6 +92,16 @@ export function Sidebar() {
           </kbd>
         </button>
         <SidebarLink icon={<Home aria-hidden className="size-4" />} label="Accueil" />
+        <Link
+          to="/agenda"
+          className={sidebarItemClass}
+          activeProps={{ className: 'bg-accent font-medium' }}
+        >
+          <span className="flex size-4 items-center justify-center text-muted-foreground">
+            <CalendarDays aria-hidden className="size-4" />
+          </span>
+          <span className="truncate">Agenda</span>
+        </Link>
         <button type="button" onClick={() => newPage(null)} className={sidebarItemClass}>
           <SquarePen aria-hidden className="size-4 text-muted-foreground" />
           Nouvelle page

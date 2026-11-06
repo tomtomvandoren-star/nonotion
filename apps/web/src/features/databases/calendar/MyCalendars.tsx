@@ -85,7 +85,6 @@ export function MyCalendars({
           {database.sources.map((source) => (
             <SourceItem
               key={source.id}
-              database={database}
               source={source}
               visible={!hidden.has(source.id)}
               onToggle={(visible) => onToggle(source.id, visible)}
@@ -97,20 +96,22 @@ export function MyCalendars({
   )
 }
 
-function SourceItem({
-  database,
+/**
+ * Un agenda de « Mes agendas » : sa case (afficher ou masquer), sa pastille, son état et son menu.
+ * Aussi dans l'Agenda de l'espace (spec 6.15).
+ */
+export function SourceItem({
   source,
   visible,
   onToggle,
 }: {
-  database: DatabaseDetail
   source: CalendarSource
   visible: boolean
   onToggle: (visible: boolean) => void
 }) {
-  const sync = useSyncCalendar(database.id)
-  const update = useUpdateCalendar(database.id)
-  const remove = useDeleteCalendar(database.id)
+  const sync = useSyncCalendar()
+  const update = useUpdateCalendar()
+  const remove = useDeleteCalendar()
   const [renaming, setRenaming] = useState(false)
   const [confirm, setConfirm] = useState(false)
   const failed = source.status === 'error'
@@ -138,8 +139,7 @@ function SourceItem({
             maxLength={100}
             onBlur={(event) => {
               const name = event.target.value.trim()
-              if (name && name !== source.name)
-                update.mutate({ sourceId: source.id, patch: { name } })
+              if (name && name !== source.name) update.mutate({ source, patch: { name } })
               setRenaming(false)
             }}
             onKeyDown={(event) => {
@@ -176,10 +176,7 @@ function SourceItem({
                 <DropdownMenuRadioGroup
                   value={source.color}
                   onValueChange={(color) =>
-                    update.mutate({
-                      sourceId: source.id,
-                      patch: { color: color as CalendarSource['color'] },
-                    })
+                    update.mutate({ source, patch: { color: color as CalendarSource['color'] } })
                   }
                 >
                   {OPTION_COLORS.filter((color) => color !== 'default').map((color) => (
@@ -196,10 +193,7 @@ function SourceItem({
                 <DropdownMenuRadioGroup
                   value={source.mode}
                   onValueChange={(mode) =>
-                    update.mutate({
-                      sourceId: source.id,
-                      patch: { mode: mode as CalendarSource['mode'] },
-                    })
+                    update.mutate({ source, patch: { mode: mode as CalendarSource['mode'] } })
                   }
                 >
                   <DropdownMenuRadioItem value="subscription">Abonnement</DropdownMenuRadioItem>
@@ -245,7 +239,7 @@ function SourceItem({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={() => remove.mutate(source.id)}>
+            <AlertDialogAction variant="destructive" onClick={() => remove.mutate(source)}>
               Supprimer
             </AlertDialogAction>
           </AlertDialogFooter>

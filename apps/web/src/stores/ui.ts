@@ -1,3 +1,4 @@
+import type { CalendarMode } from '@nonotion/shared'
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
@@ -19,6 +20,8 @@ interface UiState {
   /** Thème : celui du système, ou un choix explicite (spec 7). */
   theme: Theme
   recentPages: RecentPage[]
+  /** L'Agenda (spec 6.15) en mois, semaine ou jour : retrouvé au retour. */
+  agendaMode: CalendarMode
   /** La recherche (Ctrl+K) et l'aide des raccourcis (Ctrl+/) : ouvertes ou non, jamais mémorisé. */
   searchOpen: boolean
   /** La recherche ouverte pour choisir une page à lier : ce qu'on fait du choix (null : annulé). */
@@ -30,6 +33,7 @@ interface UiState {
   setExpanded: (pageId: string, expanded: boolean) => void
   setActiveView: (databaseId: string, viewId: string) => void
   setTheme: (theme: Theme) => void
+  setAgendaMode: (mode: CalendarMode) => void
   rememberPage: (page: RecentPage) => void
   setSearchOpen: (open: boolean) => void
   pickPage: () => Promise<{ id: string } | null>
@@ -49,11 +53,13 @@ export const useUi = create<UiState>()(
       activeViews: {},
       theme: 'system',
       recentPages: [],
+      agendaMode: 'week',
       searchOpen: false,
       searchPick: null,
       shortcutsOpen: false,
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
+      setAgendaMode: (agendaMode) => set({ agendaMode }),
       setSidebarWidth: (width) =>
         set({ sidebarWidth: Math.round(Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, width))) }),
       setExpanded: (pageId, expanded) =>
@@ -90,13 +96,22 @@ export const useUi = create<UiState>()(
       name: 'nonotion.ui',
       // L'accès au stockage peut échouer (navigation privée) : zustand l'ignore alors.
       storage: createJSONStorage(() => window.localStorage),
-      partialize: ({ sidebarOpen, sidebarWidth, expanded, activeViews, theme, recentPages }) => ({
+      partialize: ({
         sidebarOpen,
         sidebarWidth,
         expanded,
         activeViews,
         theme,
         recentPages,
+        agendaMode,
+      }) => ({
+        sidebarOpen,
+        sidebarWidth,
+        expanded,
+        activeViews,
+        theme,
+        recentPages,
+        agendaMode,
       }),
     },
   ),

@@ -1,6 +1,5 @@
 import {
   type CalendarPreview,
-  type DatabaseDetail,
   OPTION_COLOR_LABELS,
   OPTION_COLORS,
   type OptionColor,
@@ -33,20 +32,33 @@ const field =
  * panneau à droite que l'aperçu d'une tâche.
  */
 export function ImportCalendarPanel({
-  database,
+  workspaceId,
+  destinations,
+  currentId,
+  initialDestination,
+  newBaseUnder,
   onClose,
 }: {
-  database: DatabaseDetail
+  workspaceId: string
+  /** Les bases où ranger les événements : celle de la vue, ou celles de l'Agenda. */
+  destinations: { id: string; title: string }[]
+  /** La base de la vue où l'on est (« Cette base »). */
+  currentId?: string
+  /** Le choix proposé d'abord : une base, ou « new » (depuis l'Agenda : ne pas mêler aux tâches). */
+  initialDestination?: string
+  /** Une nouvelle base d'événements : sous cette page, ou au premier niveau de l'espace (null). */
+  newBaseUnder: string | null
   onClose: () => void
 }) {
   const navigate = useNavigate()
   const importer = useImportCalendar()
-  const sync = useSyncCalendar(database.id)
+  const sync = useSyncCalendar()
   const [url, setUrl] = useState('')
   const [name, setName] = useState('')
   const [color, setColor] = useState<OptionColor>('blue')
   const [mode, setMode] = useState<'subscription' | 'one_shot'>('subscription')
-  const [destination, setDestination] = useState<'this' | 'new'>('this')
+  // L'identifiant d'une base, ou « new ».
+  const [destination, setDestination] = useState(initialDestination ?? destinations[0]?.id ?? 'new')
   const [preview, setPreview] = useState<CalendarPreview | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -57,7 +69,7 @@ export function ImportCalendarPanel({
     setError(null)
     try {
       const result = await previewCalendar({
-        workspace_id: database.workspace_id,
+        workspace_id: workspaceId,
         url,
         time_zone: DEVICE_TIME_ZONE,
       })
@@ -79,7 +91,11 @@ export function ImportCalendarPanel({
         color,
         mode,
         time_zone: DEVICE_TIME_ZONE,
-        ...(destination === 'this' ? { database_id: database.id } : { page_id: database.page_id }),
+        ...(destination !== 'new'
+          ? { database_id: destination }
+          : newBaseUnder
+            ? { page_id: newBaseUnder }
+            : { workspace_id: workspaceId }),
       })
       const page = result.page
       toast.success(
@@ -246,10 +262,15 @@ export function ImportCalendarPanel({
               <select
                 id="calendar-destination"
                 value={destination}
-                onChange={(event) => setDestination(event.target.value as 'this' | 'new')}
+                onChange={(event) => setDestination(event.target.value)}
                 className={field}
               >
-                <option value="this">Cette base « {database.title || 'Sans titre'} »</option>
+                {destinations.map((base) => (
+                  <option key={base.id} value={base.id}>
+                    {base.id === currentId ? 'Cette base' : 'La base'} «{' '}
+                    {base.title || 'Sans titre'} »
+                  </option>
+                ))}
                 <option value="new">Une nouvelle base d’événements</option>
               </select>
             </div>

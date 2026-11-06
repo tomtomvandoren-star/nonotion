@@ -44,6 +44,12 @@ class Database extends Model
         return $this->hasMany(View::class)->orderBy('position')->orderBy('id');
     }
 
+    /** @return HasMany<CalendarSource, $this> */
+    public function calendarSources(): HasMany
+    {
+        return $this->hasMany(CalendarSource::class);
+    }
+
     /** @return HasMany<Page, $this> */
     public function rows(): HasMany
     {

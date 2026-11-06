@@ -39,13 +39,17 @@ class Agenda
 
     /**
      * Les bases de l'espace qui ont une Date (hors corbeille) : ce que l'Agenda peut afficher.
+     * `imported_only` : une base qui ne contient que les événements de ses agendas (créée pour un
+     * import) ; « Mes agendas » la montre par ses agendas, pas parmi les bases.
      *
-     * @return list<array{id: string, title: string, page_id: string, date_property: string}>
+     * @return list<array{id: string, title: string, page_id: string, date_property: string, imported_only: bool}>
      */
     public static function databases(Workspace $workspace): array
     {
         return Database::query()->where('workspace_id', $workspace->id)
             ->whereHas('page')
+            ->withExists('calendarSources as has_sources')
+            ->withExists(['rows as has_own_rows' => fn ($rows) => $rows->whereNull('calendar_source_id')])
             ->orderBy('created_at')->orderBy('id')
             ->get()
             ->map(fn (Database $database) => [
@@ -53,6 +57,7 @@ class Agenda
                 'title' => $database->title,
                 'page_id' => $database->page_id,
                 'date_property' => self::dateProperty($database),
+                'imported_only' => $database->has_sources && ! $database->has_own_rows,
             ])
             ->filter(fn (array $database) => $database['date_property'] !== null)
             ->values()

@@ -15,6 +15,7 @@ import {
   RegisterPage,
   ResetPasswordPage,
 } from '@/features/auth/AuthPages'
+import { AgendaPage } from '@/features/agenda/AgendaPage'
 import { HomePage } from '@/features/home/HomePage'
 import { AppLayout } from '@/features/layout/AppLayout'
 import { UpdateNotifier } from '@/features/layout/UpdateNotifier'
@@ -96,6 +97,13 @@ const homeRoute = createRoute({
   component: HomePage,
 })
 
+/** L'Agenda de l'espace (spec 6.15) : bases Nonotion, agendas abonnés, Google et iCloud réunis. */
+const agendaRoute = createRoute({
+  getParentRoute: () => appRoute,
+  path: '/agenda',
+  component: AgendaPage,
+})
+
 const pageRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/p/$pageId',
@@ -108,7 +116,7 @@ const pageRoute = createRoute({
 export const router = createRouter({
   routeTree: rootRoute.addChildren([
     guestRoute.addChildren([loginRoute, registerRoute, forgotPasswordRoute, resetPasswordRoute]),
-    appRoute.addChildren([homeRoute, pageRoute]),
+    appRoute.addChildren([homeRoute, agendaRoute, pageRoute]),
   ]),
 })
 

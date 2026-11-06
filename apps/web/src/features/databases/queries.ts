@@ -247,41 +247,50 @@ function flushRowQueues() {
 }
 
 /** Titre ou valeurs d'une ligne : affichés tout de suite partout (tableau, aperçu, autres vues). */
-export function useUpdateRow(databaseId: string) {
+/**
+ * Modifie une ligne. La base est celle du crochet, ou celle donnée à chaque appel : l'Agenda
+ * (spec 6.15) modifie des lignes de plusieurs bases.
+ */
+export function useUpdateRow(databaseId?: string) {
   const queryClient = useQueryClient()
+  const baseOf = (input: { databaseId?: string }) => input.databaseId ?? databaseId ?? ''
   /** Une réponse arrivée ne recouvre pas une saisie plus récente, encore en route. */
-  const reapplyNewer = (rowId: string, patch: RowPatch) => {
+  const reapplyNewer = (base: string, rowId: string, patch: RowPatch) => {
     const pending = pendingRowPatches.get(rowId) ?? []
     for (const newer of pending.slice(pending.indexOf(patch) + 1))
-      applyRowPatchLocally(queryClient, databaseId, rowId, newer)
+      applyRowPatchLocally(queryClient, base, rowId, newer)
   }
   return useMutation({
     mutationKey: SAVE_MUTATION_KEY,
-    mutationFn: ({ rowId, patch }: { rowId: string; patch: RowPatch }) =>
+    mutationFn: ({ rowId, patch }: { rowId: string; patch: RowPatch; databaseId?: string }) =>
       updateRowInOrder(rowId, patch),
-    onMutate: async ({ rowId, patch }) => {
+    onMutate: async (input) => {
+      const { rowId, patch } = input
+      const base = baseOf(input)
       pendingRowPatches.set(rowId, [...(pendingRowPatches.get(rowId) ?? []), patch])
       // Tout de suite (une case cochée ne revient pas en arrière le temps d'un aller-retour)…
-      const undo = applyRowPatchLocally(queryClient, databaseId, rowId, patch)
+      const undo = applyRowPatchLocally(queryClient, base, rowId, patch)
       // … et encore après avoir annulé un rafraîchissement en cours, qui remet l'état d'avant.
-      await queryClient.cancelQueries({ queryKey: databaseKey(databaseId) })
-      applyRowPatchLocally(queryClient, databaseId, rowId, patch)
-      reapplyNewer(rowId, patch)
+      await queryClient.cancelQueries({ queryKey: databaseKey(base) })
+      applyRowPatchLocally(queryClient, base, rowId, patch)
+      reapplyNewer(base, rowId, patch)
       return { undo }
     },
     // Un rafraîchissement a pu ramener l'ancienne valeur entre-temps : on reporte la nôtre.
-    onSuccess: ({ data, created }, { rowId, patch }) => {
-      applyRowPatchLocally(queryClient, databaseId, rowId, patch)
+    onSuccess: ({ data, created }, input) => {
+      const { rowId, patch } = input
+      const base = baseOf(input)
+      applyRowPatchLocally(queryClient, base, rowId, patch)
       if (created) {
         // Tâche récurrente terminée (spec 6.7) : elle perd sa répétition, la suivante apparaît.
-        applyRowPatchLocally(queryClient, databaseId, rowId, { properties: data.properties })
-        patchDatabase(queryClient, databaseId, (database) => ({
+        applyRowPatchLocally(queryClient, base, rowId, { properties: data.properties })
+        patchDatabase(queryClient, base, (database) => ({
           ...database,
           rows: [...database.rows.filter((row) => row.id !== created.id), created],
         }))
-        toast.success(nextOccurrenceMessage(queryClient, databaseId, created))
+        toast.success(nextOccurrenceMessage(queryClient, base, created))
       }
-      reapplyNewer(rowId, patch)
+      reapplyNewer(base, rowId, patch)
     },
     onError: (_error, _input, context) => {
       context?.undo()
@@ -295,17 +304,22 @@ export function useUpdateRow(databaseId: string) {
   })
 }
 
-export function useCreateRow(databaseId: string) {
+/** Crée une ligne, dans la base du crochet ou dans celle donnée à l'appel (l'Agenda). */
+export function useCreateRow(databaseId?: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationKey: SAVE_MUTATION_KEY,
-    mutationFn: (input: {
+    mutationFn: ({
+      databaseId: target,
+      ...input
+    }: {
       title?: string
       properties?: Record<string, unknown>
       position?: string
-    }) => createRow(databaseId, input),
-    onSuccess: (row: DatabaseRowData) => {
-      patchDatabase(queryClient, databaseId, (database) => ({
+      databaseId?: string
+    }) => createRow(target ?? databaseId ?? '', input),
+    onSuccess: (row: DatabaseRowData, { databaseId: target }) => {
+      patchDatabase(queryClient, target ?? databaseId ?? '', (database) => ({
         ...database,
         rows: [...database.rows.filter((item) => item.id !== row.id), row],
       }))

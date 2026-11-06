@@ -35,7 +35,7 @@ it('liste les bases qui ont une Date, avec la Date de leur calendrier, et les ag
     $agenda = $this->getJson("/api/workspaces/{$workspace->id}/agenda")->assertOk()->json('data');
 
     expect($agenda['databases'])->toHaveCount(1)
-        ->and($agenda['databases'][0])->toMatchArray(['id' => $tasks['id'], 'date_property' => $due])
+        ->and($agenda['databases'][0])->toMatchArray(['id' => $tasks['id'], 'date_property' => $due, 'imported_only' => false])
         ->and($agenda['settings'])->toBe([
             'hidden_databases' => [],
             'hidden_sources' => [],
@@ -99,8 +99,10 @@ it('un agenda importé depuis l’Agenda peut créer sa base au premier niveau d
         ->and($response['page']['title'])->toBe('École')
         ->and($response['imported'])->toBe(25);
     $agenda = $this->getJson("/api/workspaces/{$workspace->id}/agenda")->json('data');
+    // La base créée pour l'import ne contient que ses événements : « Mes agendas » la montre par son agenda.
+    $base = collect($agenda['databases'])->firstWhere('id', $response['database']['id']);
     expect($agenda['sources'][0]['name'])->toBe('École')
-        ->and(array_column($agenda['databases'], 'id'))->toContain($response['database']['id']);
+        ->and($base['imported_only'])->toBeTrue();
     // L'UID de chaque événement : l'Agenda ne montre qu'une fois un événement présent dans deux agendas.
     expect(collect($response['database']['rows'])->pluck('ics_uid')->filter())->not->toBeEmpty();
 
