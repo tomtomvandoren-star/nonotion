@@ -34,11 +34,41 @@ pub fn check_page(webview: &tauri::Webview) {
     }
 }
 
-/// Le résultat de l'essai, envoyé par la page : on l'affiche et l'application se ferme.
+/// Le résultat de l'essai, envoyé par la page : on l'affiche, avec l'état des mises à jour, et
+/// l'application se ferme.
 #[tauri::command]
-pub fn smoke_report(app: tauri::AppHandle, ok: bool, detail: String) {
+pub async fn smoke_report(app: tauri::AppHandle, ok: bool, detail: String) {
     println!("{detail}");
+    println!("{}", updates(&app).await);
     app.exit(if ok { 0 } else { 1 });
+}
+
+/// Le manifeste des mises à jour est-il lisible ? Une version plus récente y est-elle publiée ?
+async fn updates(app: &tauri::AppHandle) -> String {
+    #[cfg(desktop)]
+    {
+        use tauri::Manager;
+        use tauri_plugin_updater::UpdaterExt;
+        if !crate::updater_configured(app.config()) {
+            return "Mises à jour : non configurées (pas de clé de signature à la compilation)".into();
+        }
+        let version = &app.package_info().version;
+        match app.updater() {
+            Err(error) => format!("Mises à jour : module indisponible ({error})"),
+            Ok(updater) => match updater.check().await {
+                Ok(Some(update)) => {
+                    format!("Mises à jour : {} installée, {} disponible", version, update.version)
+                }
+                Ok(None) => format!("Mises à jour : manifeste lu, {version} est la dernière version"),
+                Err(error) => format!("Mises à jour : manifeste illisible ({error})"),
+            },
+        }
+    }
+    #[cfg(not(desktop))]
+    {
+        let _ = app;
+        "Mises à jour : sans objet".into()
+    }
 }
 
 const SCRIPT: &str = r#"

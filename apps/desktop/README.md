@@ -56,8 +56,8 @@ sauvegarder comme `APP_KEY`.
 - **Windows** : sans certificat de signature de code, SmartScreen avertit au premier lancement
   (« Informations complémentaires » puis « Exécuter quand même »).
 - **macOS** : signature ad hoc seulement ; sans compte Apple Developer (environ 99 $/an) pour la
-  notarisation, ouvrir la première fois par clic droit puis « Ouvrir » (ou Réglages système →
-  Confidentialité et sécurité → « Ouvrir quand même »).
+  notarisation, macOS bloque le premier lancement : Réglages Système → Confidentialité et
+  sécurité → « Ouvrir quand même » (depuis macOS 15, le clic droit → « Ouvrir » ne suffit plus).
 
 ## Développer
 

@@ -38,6 +38,9 @@ jobs:
     timeout-minutes: 60
     strategy:
       fail-fast: false
+      # Pour publier, un système après l'autre : chacun complète latest.json sur la version GitHub,
+      # et deux envois simultanés pourraient effacer la part de l'autre.
+      max-parallel: ${{ inputs.publier == true && 1 || 3 }}
       matrix:
         include:
           - name: Windows (.exe, .msi)
@@ -152,12 +155,15 @@ jobs:
           releaseBody: |
             Installer Nonotion sur son ordinateur :
             - **Windows** : `Nonotion_…_x64-setup.exe` (ou le `.msi`).
-            - **macOS** (Intel et Apple Silicon) : `Nonotion_…_universal.dmg`. Au premier lancement, clic droit sur l'application puis « Ouvrir » (application non notariée).
+            - **macOS** (Intel et Apple Silicon) : `Nonotion_…_universal.dmg`. Application non notariée : au premier lancement, macOS la bloque ; ouvrir alors Réglages Système → Confidentialité et sécurité → « Ouvrir quand même ».
             - **Linux** : `.AppImage` (rendre exécutable, puis lancer) ou `.deb` (Debian, Ubuntu).
 
             Les versions installées se mettent ensuite à jour d'elles-mêmes.
           releaseDraft: false
           prerelease: false
+          # Sous Windows, la mise à jour passe par l'installateur .exe (sans droits administrateur) ;
+          # une installation par le .msi garde le .msi (latest.json a une entrée pour chacun).
+          updaterJsonPreferNsis: true
 
       # L'utilisateur installe, puis ouvre l'application : l'écran de connexion doit apparaître.
       - name: Installation et démarrage (Windows)
