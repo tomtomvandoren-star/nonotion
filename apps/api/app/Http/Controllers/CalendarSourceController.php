@@ -51,11 +51,14 @@ class CalendarSourceController extends Controller
         if ($request->filled('database_id')) {
             $database = Database::query()->findOrFail($request->string('database_id'));
             Gate::authorize('update', $database);
-        } else {
+        } elseif ($request->filled('page_id')) {
             $host = Page::query()->whereNull('database_id')->findOrFail($request->string('page_id'));
             Gate::authorize('update', $host);
+        } else {
+            $host = Workspace::query()->findOrFail($request->string('workspace_id'));
+            Gate::authorize('createPage', $host);
         }
-        $workspaceId = $database->workspace_id ?? $host->workspace_id;
+        $workspaceId = $database->workspace_id ?? ($host instanceof Workspace ? $host->id : $host->workspace_id);
         $url = $this->normalized($request->string('url'));
 
         $existing = $this->duplicate($workspaceId, $url);

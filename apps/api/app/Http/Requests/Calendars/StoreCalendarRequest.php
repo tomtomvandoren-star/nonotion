@@ -16,9 +16,11 @@ class StoreCalendarRequest extends FormRequest
             'name' => ['required', 'string', 'max:100'],
             'color' => ['required', 'in:'.implode(',', PropertySchema::COLORS)],
             'mode' => ['required', 'in:'.CalendarSource::SUBSCRIPTION.','.CalendarSource::ONE_SHOT],
-            // Une base existante, ou une nouvelle base d'événements créée sous cette page.
-            'database_id' => ['nullable', 'string', 'required_without:page_id'],
-            'page_id' => ['nullable', 'string', 'required_without:database_id'],
+            // Une base existante, ou une nouvelle base d'événements créée sous cette page, ou au premier
+            // niveau de cet espace de travail (depuis l'Agenda, spec 6.15).
+            'database_id' => ['nullable', 'string', 'required_without_all:page_id,workspace_id'],
+            'page_id' => ['nullable', 'string', 'required_without_all:database_id,workspace_id'],
+            'workspace_id' => ['nullable', 'string', 'required_without_all:database_id,page_id'],
             'time_zone' => ['nullable', 'string', 'max:64'],
         ];
     }

@@ -7,6 +7,7 @@ use App\Models\Database;
 use App\Models\Page;
 use App\Models\Scopes\VisibleToCurrentUser;
 use App\Models\View;
+use App\Models\Workspace;
 use App\Support\BlockText;
 use App\Support\Databases\Databases;
 use App\Support\Databases\EventTemplate;
@@ -89,13 +90,14 @@ class CalendarImporter
     }
 
     /**
-     * Ajoute l'agenda à une base (existante, ou nouvelle sous la page $host) et l'importe.
+     * Ajoute l'agenda à une base (existante, ou nouvelle sous la page $host ; au premier niveau de
+     * l'espace de travail depuis l'Agenda, spec 6.15) et l'importe.
      * Si l'import échoue, rien ne reste : ni l'agenda, ni la base créée pour lui.
      *
      * @param  array{url: string, name: string, color: string, mode: string, time_zone: string|null}  $input
      * @return array{source: CalendarSource, database: Database, page: Page|null, created: int}
      */
-    public function create(array $input, ?Database $database, ?Page $host): array
+    public function create(array $input, ?Database $database, Page|Workspace|null $host): array
     {
         $container = null;
         if ($database === null) {

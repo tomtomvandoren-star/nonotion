@@ -8,6 +8,7 @@ use App\Models\CalendarSource;
 use App\Models\Database;
 use App\Models\Page;
 use App\Models\View;
+use App\Models\Workspace;
 use App\Support\FractionalIndex;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -35,12 +36,16 @@ class Databases
      * Une nouvelle base : la propriété Titre, une vue Tableau et trois lignes vides (spec 6.4), ou
      * le modèle demandé (« tasks » : le Gestionnaire de tâches, spec 6.7 ; « events » : une base
      * d'événements pour un agenda importé, spec 6.9).
-     * En pleine page, elle vit dans une nouvelle sous-page de $host, dont elle est tout le contenu.
+     * En pleine page, elle vit dans une nouvelle sous-page de $host, dont elle est tout le contenu ;
+     * avec l'espace de travail pour $host, une nouvelle page au premier niveau (l'Agenda, spec 6.15).
      *
      * @return array{0: Database, 1: Page} la base et la page qui la contient
      */
-    public static function create(Page $host, bool $fullPage, ?string $title, ?string $template = null): array
+    public static function create(Page|Workspace $host, bool $fullPage, ?string $title, ?string $template = null): array
     {
+        if ($host instanceof Workspace && ! $fullPage) {
+            throw new \LogicException('Une base en ligne vit dans une page.');
+        }
         [$schema, $views, $emptyRows] = match ($template) {
             TaskTemplate::NAME => [$schema = TaskTemplate::schema(), TaskTemplate::views($schema), 3],
             // Une base d'événements démarre vide : les événements arrivent avec l'import.
@@ -49,19 +54,22 @@ class Databases
         };
         $title ??= $template === TaskTemplate::NAME ? 'Tâches' : null;
 
-        return DB::transaction(function () use ($host, $fullPage, $title, $schema, $views, $emptyRows) {
+        $workspaceId = $host instanceof Workspace ? $host->id : $host->workspace_id;
+        $parentId = $host instanceof Workspace ? null : $host->id;
+
+        return DB::transaction(function () use ($host, $workspaceId, $parentId, $fullPage, $title, $schema, $views, $emptyRows) {
             $container = $host;
             if ($fullPage) {
                 $container = Page::create([
-                    'workspace_id' => $host->workspace_id,
-                    'parent_page_id' => $host->id,
+                    'workspace_id' => $workspaceId,
+                    'parent_page_id' => $parentId,
                     'title' => $title ?? '',
-                    'position' => Page::positionAtEnd($host->workspace_id, $host->id),
+                    'position' => Page::positionAtEnd($workspaceId, $parentId),
                 ]);
             }
 
             $database = Database::create([
-                'workspace_id' => $host->workspace_id,
+                'workspace_id' => $workspaceId,
                 'page_id' => $container->id,
                 'title' => $title ?? '',
                 'schema' => $schema,
@@ -70,7 +78,7 @@ class Databases
             $position = null;
             foreach ($views as $view) {
                 $position = FractionalIndex::between($position, null);
-                View::create([...$view, 'workspace_id' => $host->workspace_id, 'database_id' => $database->id, 'position' => $position]);
+                View::create([...$view, 'workspace_id' => $workspaceId, 'database_id' => $database->id, 'position' => $position]);
             }
 
             $position = null;
@@ -218,6 +226,8 @@ class Databases
             'position' => $row->position,
             // Un événement importé d'un agenda (spec 6.9) : titre et date en lecture seule.
             'calendar_source_id' => $row->calendar_source_id,
+            // Son UID iCalendar : l'Agenda n'affiche qu'une fois le même événement venu de deux agendas.
+            'ics_uid' => $row->calendar_source_id === null ? null : $row->ics_uid,
             'created_at' => $row->created_at?->toIso8601String(),
             'updated_at' => $row->updated_at?->toIso8601String(),
         ];

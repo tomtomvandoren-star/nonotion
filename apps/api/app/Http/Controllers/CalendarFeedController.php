@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Database;
 use App\Models\Page;
 use App\Models\Scopes\VisibleToCurrentUser;
-use App\Models\View;
+use App\Support\Calendars\Agenda;
 use App\Support\Databases\PropertyValue;
 use DateInterval;
 use DateTimeImmutable;
@@ -61,7 +61,7 @@ class CalendarFeedController extends Controller
             // Une indication pour les agendas qui la lisent (le Calendrier Apple) : relire toutes les heures.
             'X-PUBLISHED-TTL' => 'PT1H',
         ]);
-        $date = self::dateProperty($database);
+        $date = Agenda::dateProperty($database);
         $status = collect($database->schema)->firstWhere('type', 'status');
         $done = $status === null ? [] : collect($status['options'])->where('group', 'complete')->pluck('id')->all();
 
@@ -84,17 +84,6 @@ class CalendarFeedController extends Controller
             'Content-Type' => 'text/calendar; charset=utf-8',
             'Cache-Control' => 'private, max-age=300',
         ]);
-    }
-
-    /** La Date du premier calendrier de la base, sinon sa première Date. */
-    private static function dateProperty(Database $database): ?string
-    {
-        $dates = collect($database->schema)->where('type', 'date')->pluck('id');
-        $calendarBy = View::query()->withoutGlobalScope(VisibleToCurrentUser::class)
-            ->where('database_id', $database->id)->where('type', 'calendar')
-            ->orderBy('position')->get()->pluck('config.calendar_by')->first(fn ($id) => $dates->contains($id));
-
-        return $calendarBy ?? $dates->first();
     }
 
     /** @param array{start: string, end?: string|null, repeat?: array<string, mixed>|null} $value */

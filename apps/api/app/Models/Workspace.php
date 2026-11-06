@@ -16,6 +16,14 @@ class Workspace extends Model
 {
     use HasUlids;
 
+    protected function casts(): array
+    {
+        return [
+            // Les réglages de la page « Agenda » (spec 6.15) : voir App\Support\Calendars\Agenda.
+            'agenda' => 'array',
+        ];
+    }
+
     /** @return BelongsToMany<User, $this> */
     public function members(): BelongsToMany
     {

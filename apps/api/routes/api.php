@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AgendaController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CalendarFeedController;
 use App\Http\Controllers\CalendarSourceController;
@@ -41,6 +42,8 @@ Route::middleware(['auth:sanctum', 'throttle:240,1'])->group(function () {
     Route::post('/workspaces/{workspace}/pages', [PageController::class, 'store']);
     Route::get('/workspaces/{workspace}/trash', [TrashController::class, 'index']);
     Route::get('/workspaces/{workspace}/search', SearchController::class);
+    Route::get('/workspaces/{workspace}/agenda', [AgendaController::class, 'show']);
+    Route::patch('/workspaces/{workspace}/agenda', [AgendaController::class, 'update']);
 
     Route::get('/pages/{page}', [PageController::class, 'show']);
     Route::patch('/pages/{page}', [PageController::class, 'update']);
