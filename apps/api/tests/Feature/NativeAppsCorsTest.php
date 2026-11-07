@@ -18,7 +18,11 @@ it('admet les vues web de l’application pour ordinateur', function (string $or
     $this->getJson('/api/health', ['Origin' => $origin])
         ->assertOk()
         ->assertHeader('Access-Control-Allow-Origin', $origin);
-})->with(['tauri://localhost', 'http://tauri.localhost', 'https://tauri.localhost']);
+})->with([
+    'tauri://localhost', 'http://tauri.localhost', 'https://tauri.localhost',
+    // Les applications mobiles (Capacitor, phase 10) : Android, puis iOS.
+    'https://localhost', 'capacitor://localhost',
+]);
 
 it('n’admet pas un autre site', function () {
     $this->getJson('/api/health', ['Origin' => 'https://ailleurs.example'])

@@ -1,6 +1,7 @@
 import { Outlet } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { useNewPage } from '@/features/pages/useNewPage'
+import { TaskReminders } from '@/features/reminders/TaskReminders'
 import { SearchPalette } from '@/features/search/SearchPalette'
 import { Sidebar } from '@/features/sidebar/Sidebar'
 import { isModPressed } from '@/lib/shortcuts'
@@ -19,7 +20,7 @@ export function AppLayout() {
   useTheme()
 
   return (
-    <div className="flex h-dvh overflow-hidden pt-[env(safe-area-inset-top)]">
+    <div className="flex h-dvh overflow-hidden pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)]">
       {sidebarOpen && (
         <>
           <Sidebar />
@@ -40,6 +41,8 @@ export function AppLayout() {
       </div>
       <SearchPalette />
       <ShortcutsDialog />
+      {/* Les rappels des tâches, dans l'application mobile seulement (phase 10). */}
+      <TaskReminders />
     </div>
   )
 }

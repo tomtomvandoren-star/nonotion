@@ -1,6 +1,6 @@
 import type { DatabaseDetail } from '@nonotion/shared'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Copy, Link2Off } from 'lucide-react'
+import { Copy, Link2Off, Share2 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { SidePanel } from '@/features/layout/SidePanel'
@@ -56,6 +56,8 @@ export function CalendarFeedPanel({
   const google = webcal
     ? `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(webcal)}`
     : null
+  // La feuille de partage du système : sur téléphone, et dans les navigateurs qui en ont une.
+  const canShare = platform.kind === 'mobile' || typeof navigator.share === 'function'
   const copy = () => {
     if (!url) return
     navigator.clipboard
@@ -110,6 +112,19 @@ export function CalendarFeedPanel({
             <button type="button" onClick={copy} className={button}>
               <Copy aria-hidden className="size-4" /> Copier le lien
             </button>
+            {canShare && (
+              <button
+                type="button"
+                onClick={() =>
+                  void platform
+                    .share({ title: `Agenda « ${database.title || 'Sans titre'} »`, url })
+                    .then((shared) => shared || copy())
+                }
+                className={button}
+              >
+                <Share2 aria-hidden className="size-4" /> Partager le lien
+              </button>
+            )}
             <button type="button" onClick={() => openOrSay(google!)} className={button}>
               Ajouter à Google Agenda
             </button>

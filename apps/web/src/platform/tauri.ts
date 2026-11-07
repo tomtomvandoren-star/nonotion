@@ -72,6 +72,8 @@ export const tauriPlatform: Platform = {
   kind: 'desktop',
   secureStorage,
   openExternal,
+  // Pas de feuille de partage sur ordinateur : « Copier le lien ».
+  share: async () => false,
   checkForUpdate: async () => {
     // Sans clé de signature des mises à jour configurée à la compilation, le module n'est pas chargé.
     const update = await check().catch(() => null)

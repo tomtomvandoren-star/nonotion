@@ -11,6 +11,9 @@ export default defineConfig(
       '**/dist/**',
       '**/dist-sandbox/**',
       '**/dist-desktop/**',
+      '**/dist-mobile/**',
+      'apps/mobile/android/**',
+      'apps/mobile/ios/**',
       'apps/desktop/src-tauri/target/**',
       'apps/desktop/src-tauri/gen/**',
       'apps/api/**',
@@ -33,7 +36,13 @@ export default defineConfig(
     },
   },
   {
-    files: ['*.{js,ts}', 'e2e/**/*.ts', '**/vite.config.ts', '**/vitest.config.ts'],
+    files: [
+      '*.{js,ts}',
+      'e2e/**/*.ts',
+      '**/vite.config.ts',
+      '**/vitest.config.ts',
+      'apps/mobile/scripts/*.mjs',
+    ],
     languageOptions: { globals: { ...globals.node } },
   },
 )

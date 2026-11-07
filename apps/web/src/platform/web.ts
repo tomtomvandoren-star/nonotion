@@ -34,6 +34,18 @@ export const webPlatform: Platform = {
   openExternal: async (url) => {
     window.open(url, '_blank', 'noopener,noreferrer')
   },
+  // La feuille de partage du navigateur, là où elle existe (téléphone, Safari, Edge).
+  share: async ({ title, url }) => {
+    if (typeof navigator.share !== 'function') return false
+    try {
+      await navigator.share({ title, url })
+    } catch (error) {
+      // Partage refusé ou annulé : seul « non disponible » renvoie à la copie.
+      if (error instanceof DOMException && error.name === 'NotAllowedError') return false
+    }
+    return true
+  },
   // Le site se met à jour à chaque déploiement : rien à installer.
   checkForUpdate: async () => null,
+  reminders: null,
 }

@@ -61,7 +61,8 @@ export function Sidebar() {
       className={cn(
         'relative flex h-dvh shrink-0 flex-col bg-sidebar text-sm',
         // Sous 768 px, la barre latérale devient un tiroir au-dessus du contenu.
-        'max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:shadow-xl',
+        // Sur téléphone, par-dessus la page : sous la barre d'état, au-dessus de la barre de gestes.
+        'max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-40 max-md:pt-[env(safe-area-inset-top)] max-md:pb-[env(safe-area-inset-bottom)] max-md:pl-[env(safe-area-inset-left)] max-md:shadow-xl',
       )}
       style={{ width }}
     >

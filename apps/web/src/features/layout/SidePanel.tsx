@@ -55,7 +55,7 @@ export function SidePanel({
       role="dialog"
       aria-label={label}
       className={cn(
-        'fixed inset-y-0 right-0 z-40 flex w-full max-w-[min(720px,100vw)] flex-col border-l border-border bg-background shadow-xl',
+        'fixed inset-y-0 right-0 z-40 flex w-full max-w-[min(720px,100vw)] flex-col border-l border-border bg-background pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] shadow-xl',
         className,
       )}
     >

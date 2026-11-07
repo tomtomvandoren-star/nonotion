@@ -26,7 +26,12 @@ const rootRoute = createRootRoute({
   component: () => (
     <TooltipProvider delayDuration={400}>
       <Outlet />
-      <Toaster position="bottom-center" />
+      {/* Au-dessus de la barre de gestes des téléphones (zone sûre du bas). */}
+      <Toaster
+        position="bottom-center"
+        offset={{ bottom: 'calc(24px + env(safe-area-inset-bottom))' }}
+        mobileOffset={{ bottom: 'calc(16px + env(safe-area-inset-bottom))' }}
+      />
       <UpdateNotifier />
     </TooltipProvider>
   ),
