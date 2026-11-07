@@ -101,7 +101,12 @@ const homeRoute = createRoute({
 const agendaRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/agenda',
-  component: AgendaPage,
+  // Le retour de « Connecter Google Agenda » : google, annulee ou echec.
+  validateSearch: z.object({ connexion: z.string().optional() }),
+  component: function Agenda() {
+    const { connexion } = agendaRoute.useSearch()
+    return <AgendaPage connexion={connexion} />
+  },
 })
 
 const pageRoute = createRoute({

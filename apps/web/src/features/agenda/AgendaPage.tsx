@@ -32,9 +32,11 @@ import { WeekView } from '@/features/databases/calendar/WeekView'
 import { completionFor } from '@/features/databases/completion'
 import { useCreateRow, useUpdateRow } from '@/features/databases/queries'
 import { RowPeek } from '@/features/databases/RowPeek'
+import { useNavigate } from '@tanstack/react-router'
 import { useWorkspaceId } from '@/features/pages/queries'
 import { requestTitleFocus } from '@/features/pages/useNewPage'
 import { useUi } from '@/stores/ui'
+import { AccountCalendarsPanel, ICloudPanel } from './AccountPanels'
 import { AgendaCalendars } from './AgendaCalendars'
 import { useAgenda, useAgendaDatabases } from './queries'
 
@@ -48,7 +50,7 @@ type Placed = { database: DatabaseDetail; propertyId: string; source: CalendarSo
  * des bases Nonotion, les agendas abonnés par lien, et (plus tard dans la phase) Google et iCloud,
  * dans la même grille que la vue Calendrier d'une base (6.8).
  */
-export function AgendaPage() {
+export function AgendaPage({ connexion }: { connexion?: string }) {
   const workspaceId = useWorkspaceId() ?? ''
   const agenda = useAgenda(workspaceId)
 
@@ -61,22 +63,55 @@ export function AgendaPage() {
           L’Agenda n’a pas pu être chargé.
         </p>
       ) : (
-        <AgendaBody workspaceId={workspaceId} agenda={agenda.data} />
+        <AgendaBody workspaceId={workspaceId} agenda={agenda.data} connexion={connexion} />
       )}
     </div>
   )
 }
 
-function AgendaBody({ workspaceId, agenda }: { workspaceId: string; agenda: Agenda }) {
+/** Les panneaux à droite : une ligne, l'import d'un agenda, iCloud, les agendas d'un compte. */
+type Panel =
+  | { kind: 'row'; rowId: string }
+  | { kind: 'import' }
+  | { kind: 'icloud' }
+  | { kind: 'account'; accountId: string }
+
+/** Les messages du retour de Google (`?connexion=`). */
+const CONNEXION_MESSAGES: Record<string, string> = {
+  annulee: 'La connexion à Google Agenda a été annulée.',
+  echec: 'Google n’a pas pu connecter ce compte. Réessayez dans un instant.',
+}
+
+function AgendaBody({
+  workspaceId,
+  agenda,
+  connexion,
+}: {
+  workspaceId: string
+  agenda: Agenda
+  connexion?: string
+}) {
   const { settings, sources } = agenda
   const mode = useUi((s) => s.agendaMode)
   const setMode = useUi((s) => s.setAgendaMode)
   const today = todayIn(timeZone)
   const [anchor, setAnchor] = useState<Day>(today)
-  const [panel, setPanel] = useState<{ kind: 'row'; rowId: string } | { kind: 'import' } | null>(
-    null,
-  )
+  // Au retour de Google : le compte est là, on propose tout de suite de choisir ses agendas.
+  const [panel, setPanel] = useState<Panel | null>(() => {
+    const latest = agenda.accounts.filter((account) => account.provider === 'google').at(-1)
+    return connexion === 'google' && latest ? { kind: 'account', accountId: latest.id } : null
+  })
+  const navigate = useNavigate()
+  useEffect(() => {
+    if (!connexion) return
+    if (connexion === 'google')
+      toast.success('Google Agenda est connecté : choisissez les agendas à synchroniser.')
+    else toast.error(CONNEXION_MESSAGES[connexion] ?? CONNEXION_MESSAGES.echec!)
+    void navigate({ to: '/agenda', search: {}, replace: true })
+  }, [connexion, navigate])
   const closePanel = useCallback(() => setPanel(null), [])
+  const accountOf = (accountId: string) =>
+    agenda.accounts.find((account) => account.id === accountId)
   const sectionRef = useRef<HTMLElement>(null)
   const updateRow = useUpdateRow()
   const createRow = useCreateRow()
@@ -182,10 +217,11 @@ function AgendaBody({ workspaceId, agenda }: { workspaceId: string; agenda: Agen
     if (where.source)
       return {
         color: where.source.color,
-        locked: true,
+        // Un agenda par lien est en lecture seule ; Google et iCloud se modifient dans les deux sens.
+        locked: where.source.kind === 'ics' || !where.source.writable,
         completion: null,
         checkable: false,
-        source: { kind: 'ics', label: where.source.name },
+        source: { kind: where.source.kind, label: where.source.name },
       }
     const color = settings.colors[where.database.id]
     return {
@@ -286,6 +322,8 @@ function AgendaBody({ workspaceId, agenda }: { workspaceId: string; agenda: Agen
             workspaceId={workspaceId}
             agenda={agenda}
             onImport={() => setPanel({ kind: 'import' })}
+            onConnectICloud={() => setPanel({ kind: 'icloud' })}
+            onAccountCalendars={(account) => setPanel({ kind: 'account', accountId: account.id })}
           />
         </div>
         <div className="min-w-0 flex-1">
@@ -304,6 +342,21 @@ function AgendaBody({ workspaceId, agenda }: { workspaceId: string; agenda: Agen
           destinations={agenda.databases.map((base) => ({ id: base.id, title: base.title }))}
           initialDestination="new"
           newBaseUnder={null}
+          onClose={closePanel}
+        />
+      )}
+      {panel?.kind === 'icloud' && (
+        <ICloudPanel
+          workspaceId={workspaceId}
+          onConnected={(account) => setPanel({ kind: 'account', accountId: account.id })}
+          onClose={closePanel}
+        />
+      )}
+      {panel?.kind === 'account' && accountOf(panel.accountId) && (
+        <AccountCalendarsPanel
+          workspaceId={workspaceId}
+          account={accountOf(panel.accountId)!}
+          agenda={agenda}
           onClose={closePanel}
         />
       )}

@@ -38,6 +38,8 @@ export type PagePatch = Partial<{
   icon: string | null
   cover_url: string | null
   is_favorite: boolean
+  /** « Ignorer » la version écartée d'un conflit de synchronisation (spec 6.15). */
+  sync_conflict: null
 }>
 
 /**

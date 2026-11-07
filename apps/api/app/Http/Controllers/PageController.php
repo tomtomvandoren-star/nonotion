@@ -88,6 +88,11 @@ class PageController extends Controller
         $database = null;
         $before = $page->properties ?? [];
         self::guardImported($request, $page);
+        // « Ignorer » la version écartée d'un conflit (spec 6.15).
+        if ($request->has('sync_conflict')) {
+            unset($attributes['sync_conflict']);
+            $page->forceFill(['sync_conflict' => null]);
+        }
         if ($request->has('position') && $page->database_id === null) {
             throw ValidationException::withMessages(['position' => 'Pour ranger une page, déplacez-la dans l’arbre.']);
         }
@@ -288,6 +293,8 @@ class PageController extends Controller
             'database_id' => $page->database_id,
             'properties' => $page->database_id === null ? null : (object) ($page->properties ?? []),
             'calendar_source_id' => $page->calendar_source_id,
+            // Modifié des deux côtés (spec 6.15) : la version écartée.
+            'sync_conflict' => $page->sync_conflict,
             'cover_url' => $page->cover_url,
             'content' => $page->content,
             'version' => $page->version,

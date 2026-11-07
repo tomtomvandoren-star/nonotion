@@ -28,6 +28,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { useInstantValue } from '@/lib/useInstantValue'
 import { cn } from '@/lib/utils'
 import { OptionPill } from '../propertyDisplay'
 import {
@@ -113,6 +114,7 @@ export function SourceItem({
   const update = useUpdateCalendar()
   const remove = useDeleteCalendar()
   const [renaming, setRenaming] = useState(false)
+  const [shown, setShown] = useInstantValue(visible)
   const [confirm, setConfirm] = useState(false)
   const failed = source.status === 'error'
 
@@ -122,8 +124,11 @@ export function SourceItem({
         <input
           type="checkbox"
           aria-label={`Afficher ${source.name}`}
-          checked={visible}
-          onChange={(event) => onToggle(event.target.checked)}
+          checked={shown}
+          onChange={(event) => {
+            setShown(event.target.checked)
+            onToggle(event.target.checked)
+          }}
           className="size-4 shrink-0 accent-[var(--accent)]"
         />
         <span

@@ -26,6 +26,20 @@ export const pageDetailSchema = pageTreeItemSchema.extend({
   properties: z.record(z.string(), z.unknown()).nullable().optional(),
   /** Un événement importé d'un agenda (spec 6.9) : son titre suit l'agenda d'origine. */
   calendar_source_id: z.string().nullable().optional(),
+  /**
+   * Un événement Google ou iCloud modifié des deux côtés (spec 6.15) : la version écartée, celle de
+   * Nonotion (local) ou celle du fournisseur (remote), gardée sur la page jusqu'à ce qu'on l'ignore.
+   */
+  sync_conflict: z
+    .object({
+      lost: z.enum(['local', 'remote']),
+      at: z.string(),
+      title: z.string(),
+      date: z.object({ start: z.string().optional(), end: z.string().optional() }),
+      location: z.string(),
+    })
+    .nullable()
+    .optional(),
   cover_url: z.string().nullable(),
   content: pageContentSchema,
   version: z.number().int().min(1),

@@ -1,5 +1,6 @@
 import type { DateValue } from '@nonotion/shared'
 import { displayTitle } from '@/features/pages/displayTitle'
+import { useInstantValue } from '@/lib/useInstantValue'
 import { cn } from '@/lib/utils'
 import { formatDate } from '../values'
 import { type CalendarItem, daysBetween, timeOf } from './dates'
@@ -21,14 +22,19 @@ export function DoneBox({
   className?: string
 }) {
   const completion = look.completion
+  const done = completion?.isDone(item.row) ?? false
+  // Cochée dès le clic : la ligne n'est mise à jour qu'un instant après.
+  const [checked, setChecked] = useInstantValue(done)
   if (!look.checkable || !completion || item.ghost) return null
-  const done = completion.isDone(item.row)
   return (
     <input
       type="checkbox"
-      aria-label={`${displayTitle(item.row.title)} : ${done ? 'fait' : 'à faire'}`}
-      checked={done}
-      onChange={() => completion.toggle(item.row)}
+      aria-label={`${displayTitle(item.row.title)} : ${checked ? 'fait' : 'à faire'}`}
+      checked={checked}
+      onChange={() => {
+        setChecked(!checked)
+        completion.toggle(item.row)
+      }}
       onPointerDown={(event) => event.stopPropagation()}
       className={cn('size-3.5 shrink-0 cursor-pointer accent-[var(--primary)]', className)}
     />

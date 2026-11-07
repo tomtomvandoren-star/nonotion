@@ -16,14 +16,6 @@ export type ItemLook = {
   source: Source | null
 }
 
-export const plainLook = (color: string | null, completion: Completion | null): ItemLook => ({
-  color,
-  locked: color !== null,
-  completion,
-  checkable: false,
-  source: null,
-})
-
 /** Le nom accessible d'un élément : son titre, sa date, et sa source dans l'Agenda. */
 export const itemLabel = (item: CalendarItem, look: ItemLook, when: string) =>
   [displayTitle(item.row.title), when, look.source?.label].filter(Boolean).join(', ') +

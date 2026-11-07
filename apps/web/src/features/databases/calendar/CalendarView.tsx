@@ -24,7 +24,7 @@ import {
   type DateProperty,
   visibleDays,
 } from './dates'
-import { plainLook } from './look'
+import type { ItemLook } from './look'
 import { MonthView } from './MonthView'
 import { MyCalendars } from './MyCalendars'
 import { type DragStart, useCalendarDrag } from './useCalendarDrag'
@@ -118,9 +118,9 @@ function Calendar({
 
   // « Mes agendas » : les événements d'un agenda masqué ne s'affichent pas dans ce calendrier.
   const hidden = new Set(view.config.hidden_sources ?? [])
-  const colors = new Map(database.sources.map((source) => [source.id, source.color]))
-  const colorOf = (item: CalendarItem) =>
-    item.row.calendar_source_id ? (colors.get(item.row.calendar_source_id) ?? null) : null
+  const sources = new Map(database.sources.map((source) => [source.id, source]))
+  const sourceOf = (item: CalendarItem) =>
+    item.row.calendar_source_id ? sources.get(item.row.calendar_source_id) : undefined
 
   const lastDay = visibleDays(mode, anchor).at(-1)!
   const dated: CalendarItem[] = []
@@ -152,7 +152,18 @@ function Calendar({
     anchor,
     today,
     items: dated,
-    lookOf: (item: CalendarItem) => plainLook(colorOf(item), completion),
+    lookOf: (item: CalendarItem): ItemLook => {
+      const source = sourceOf(item)
+      return {
+        // La couleur de l'agenda d'où vient l'élément.
+        color: source?.color ?? null,
+        // Un agenda par lien est en lecture seule ; Google et iCloud se modifient (spec 6.15).
+        locked: source !== undefined && (source.kind === 'ics' || !source.writable),
+        completion,
+        checkable: false,
+        source: null,
+      }
+    },
     onOpen: open,
     onCreate,
     onDragStart: drag.start,

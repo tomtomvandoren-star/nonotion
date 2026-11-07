@@ -20,6 +20,8 @@ class UpdatePageRequest extends FormRequest
             'properties' => ['sometimes', 'array'],
             // Ligne de base : sa place dans la base (glisser une carte du Board, spec 6.11).
             'position' => ['sometimes', new FractionalKey],
+            // Événement Google ou iCloud : « Ignorer » la version écartée d'un conflit (null seulement).
+            'sync_conflict' => ['sometimes', 'nullable', 'array', 'max:0'],
         ];
     }
 }

@@ -1,9 +1,11 @@
 import {
+  calendarAccountSchema,
   calendarPreviewSchema,
   calendarSourceSchema,
   databaseDetailSchema,
   type OptionColor,
   pageDetailSchema,
+  remoteCalendarSchema,
 } from '@nonotion/shared'
 import { z } from 'zod'
 import { apiRequest } from './client'
@@ -71,5 +73,65 @@ export const deleteCalendar = (sourceId: string) =>
   apiRequest(
     'DELETE',
     `calendar-sources/${sourceId}`,
+    z.object({ data: z.object({ moved_to_trash: z.number().int() }) }),
+  ).then((r) => r.data)
+
+/*
+ * Comptes Google et iCloud connectés (spec 6.15). Aucun jeton ni mot de passe ne revient : le
+ * serveur les garde chiffrés.
+ */
+
+/** L'adresse de la page de connexion de Google, à ouvrir dans le navigateur. */
+export const connectGoogle = (workspaceId: string) =>
+  apiRequest(
+    'POST',
+    `workspaces/${workspaceId}/calendar-accounts/google`,
+    z.object({ data: z.object({ url: z.string() }) }),
+  ).then((r) => r.data)
+
+export const connectICloud = (
+  workspaceId: string,
+  credentials: { username: string; password: string },
+) =>
+  apiRequest(
+    'POST',
+    `workspaces/${workspaceId}/calendar-accounts/icloud`,
+    z.object({ data: calendarAccountSchema }),
+    credentials,
+  ).then((r) => r.data)
+
+export const fetchAccountCalendars = (accountId: string) =>
+  apiRequest(
+    'GET',
+    `calendar-accounts/${accountId}/calendars`,
+    z.object({ data: z.array(remoteCalendarSchema) }),
+  ).then((r) => r.data)
+
+export type AddAccountCalendarInput = {
+  remote_id: string
+  name: string
+  color: OptionColor
+  /** Une base existante, ou une nouvelle base d'événements au premier niveau de l'espace. */
+  database_id?: string
+  workspace_id?: string
+}
+
+export const addAccountCalendar = (accountId: string, input: AddAccountCalendarInput) =>
+  apiRequest(
+    'POST',
+    `calendar-accounts/${accountId}/calendars`,
+    z.object({
+      data: calendarSourceSchema,
+      imported: z.number().int(),
+      database: databaseDetailSchema,
+      page: pageDetailSchema.nullable(),
+    }),
+    input,
+  )
+
+export const disconnectAccount = (accountId: string) =>
+  apiRequest(
+    'DELETE',
+    `calendar-accounts/${accountId}`,
     z.object({ data: z.object({ moved_to_trash: z.number().int() }) }),
   ).then((r) => r.data)

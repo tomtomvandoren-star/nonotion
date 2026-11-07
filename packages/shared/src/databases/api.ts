@@ -21,10 +21,18 @@ export const databaseRowSchema = z.object({
 
 export const CALENDAR_MODES = ['subscription', 'one_shot'] as const
 
+/** D'où vient un agenda : un lien ICS (lecture seule), ou un compte Google ou iCloud (spec 6.15). */
+export const CALENDAR_KINDS = ['ics', 'google', 'icloud'] as const
+
 /** Un agenda importé par lien ICS (spec 6.9). Le lien lui-même n'est jamais renvoyé : son domaine seulement. */
 export const calendarSourceSchema = z.object({
   id: z.string(),
   database_id: z.string(),
+  kind: z.enum(CALENDAR_KINDS).default('ics'),
+  /** Le compte connecté d'un agenda Google ou iCloud. */
+  account_id: z.string().nullable().optional(),
+  /** Synchronisé dans les deux sens : ses événements se modifient dans Nonotion. */
+  writable: z.boolean().default(false),
   name: z.string(),
   color: z.enum(OPTION_COLORS),
   url_host: z.string(),
@@ -80,6 +88,25 @@ export const databaseDetailSchema = z.object({
   feed_url: z.string().nullable().optional(),
 })
 
+/** Un compte Google ou iCloud connecté (spec 6.15) ; ses identifiants ne quittent jamais le serveur. */
+export const calendarAccountSchema = z.object({
+  id: z.string(),
+  provider: z.enum(['google', 'icloud']),
+  account_email: z.string(),
+  status: z.enum(['ok', 'error']),
+  error_message: z.string().nullable(),
+  last_sync_at: isoDate.nullable(),
+})
+
+/** Un agenda d'un compte connecté, et l'agenda Nonotion qui le synchronise déjà, s'il y en a un. */
+export const remoteCalendarSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  color: z.string().nullable(),
+  writable: z.boolean(),
+  source_id: z.string().nullable(),
+})
+
 /**
  * Les réglages de la page « Agenda » de l'espace (spec 6.15). On retient ce qui est masqué : une
  * nouvelle base, un nouvel agenda apparaissent d'eux-mêmes.
@@ -109,11 +136,16 @@ export const agendaSchema = z.object({
     }),
   ),
   sources: z.array(calendarSourceSchema),
+  accounts: z.array(calendarAccountSchema).default([]),
+  /** « Connecter Google Agenda » : seulement si le serveur a ses identifiants OAuth. */
+  google_available: z.boolean().default(false),
 })
 
 export type DatabaseRowData = z.infer<typeof databaseRowSchema>
 export type Agenda = z.infer<typeof agendaSchema>
 export type AgendaSettings = z.infer<typeof agendaSettingsSchema>
+export type CalendarAccount = z.infer<typeof calendarAccountSchema>
+export type RemoteCalendar = z.infer<typeof remoteCalendarSchema>
 export type DatabaseView = z.infer<typeof databaseViewSchema>
 export type DatabaseDetail = z.infer<typeof databaseDetailSchema>
 export type CalendarSource = z.infer<typeof calendarSourceSchema>
@@ -129,5 +161,7 @@ export function importedLocks(
 ): Set<string> {
   if (!row.calendar_source_id) return new Set()
   const source = database.sources.find((item) => item.id === row.calendar_source_id)
+  // Un agenda Google ou iCloud se modifie dans les deux sens (spec 6.15).
+  if (source?.writable && source.kind !== 'ics') return new Set()
   return new Set(['title', ...Object.values(source?.property_map ?? {})])
 }

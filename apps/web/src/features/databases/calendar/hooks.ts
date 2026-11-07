@@ -55,6 +55,12 @@ const syncedOnOpen = new Set<string>()
  * Synchronisation à l'ouverture (spec 6.9) : d'une base ou de l'Agenda (spec 6.15), un agenda en abonnement qui n'a pas été resynchronisé
  * depuis plus de 15 minutes l'est maintenant, sans attendre le planificateur.
  */
+/**
+ * Un agenda par lien se relit après 15 minutes ; un agenda Google ou iCloud, après 2 minutes (on
+ * l'ouvre pour voir ce qui vient d'y changer, spec 6.15).
+ */
+const staleAfterMinutes = (source: CalendarSource) => (source.kind === 'ics' ? 15 : 2)
+
 export function useSyncOnOpen(sources: readonly CalendarSource[]) {
   const sync = useSyncCalendar()
   useEffect(() => {
@@ -63,7 +69,8 @@ export function useSyncOnOpen(sources: readonly CalendarSource[]) {
         source.mode === 'subscription' &&
         source.status !== 'error' &&
         !syncedOnOpen.has(source.id) &&
-        (!source.last_sync_at || Date.now() - Date.parse(source.last_sync_at) > 15 * 60_000),
+        (!source.last_sync_at ||
+          Date.now() - Date.parse(source.last_sync_at) > staleAfterMinutes(source) * 60_000),
     )
     for (const source of stale) {
       syncedOnOpen.add(source.id)

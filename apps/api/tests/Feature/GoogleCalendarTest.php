@@ -222,6 +222,12 @@ it('modifié des deux côtés : la version la plus récente gagne, l’autre res
     expect(Page::query()->find($row['id'])->title)->toBe('Dentiste (Nonotion 2)')
         ->and($google->events['dentiste']['summary'])->toBe('Dentiste (Nonotion 2)')
         ->and(Page::query()->find($row['id'])->sync_conflict)->toMatchArray(['lost' => 'remote', 'title' => 'Dentiste (Google 2)']);
+
+    // La page montre la version écartée, jusqu'à ce qu'on l'ignore.
+    $this->getJson("/api/pages/{$row['id']}")->assertJsonPath('data.sync_conflict.title', 'Dentiste (Google 2)');
+    $this->patchJson("/api/pages/{$row['id']}", ['sync_conflict' => ['x' => 1]])->assertJsonValidationErrors('sync_conflict');
+    $this->patchJson("/api/pages/{$row['id']}", ['sync_conflict' => null])->assertOk();
+    $this->getJson("/api/pages/{$row['id']}")->assertJsonPath('data.sync_conflict', null);
 });
 
 it('rafraîchit un jeton expiré ; un jeton révoqué demande de reconnecter le compte', function () {

@@ -36,29 +36,38 @@ export function useAgendaDatabases(databaseIds: readonly string[]) {
   })
 }
 
-/** Un réglage de l'Agenda (base masquée, couleur…) : à l'écran tout de suite. */
+/**
+ * Un réglage de l'Agenda (base masquée, couleur…) : à l'écran dès le clic. Appliqué avant même que
+ * la mutation ne démarre (elle commence un instant plus tard) : une case cochée ne revient pas en
+ * arrière entre-temps.
+ */
 export function useUpdateAgenda(workspaceId: string) {
   const queryClient = useQueryClient()
-  return useMutation({
+  const apply = (patch: Partial<AgendaSettings>) =>
+    queryClient.setQueryData<Agenda>(agendaKey(workspaceId), (current) =>
+      current ? { ...current, settings: { ...current.settings, ...patch } } : current,
+    )
+  const mutation = useMutation({
     mutationKey: SAVE_MUTATION_KEY,
     mutationFn: (patch: Partial<AgendaSettings>) => updateAgenda(workspaceId, patch),
     onMutate: async (patch) => {
-      const previous = queryClient.getQueryData<Agenda>(agendaKey(workspaceId))
-      const apply = () =>
-        queryClient.setQueryData<Agenda>(agendaKey(workspaceId), (current) =>
-          current ? { ...current, settings: { ...current.settings, ...patch } } : current,
-        )
-      // Tout de suite (une case ne revient pas en arrière le temps d'un aller-retour), et encore
-      // après avoir annulé un rafraîchissement en cours, qui remettrait l'état d'avant.
-      apply()
-      await queryClient.cancelQueries({ queryKey: agendaKey(workspaceId) })
-      apply()
-      return { previous }
+      // Encore après avoir annulé un rafraîchissement en cours, qui remettrait l'état d'avant.
+      await queryClient.cancelQueries({ queryKey: agendaKey(workspaceId) }, { revert: false })
+      apply(patch)
     },
     onSuccess: (agenda) => queryClient.setQueryData(agendaKey(workspaceId), agenda),
-    onError: (_error, _patch, context) => {
-      if (context?.previous) queryClient.setQueryData(agendaKey(workspaceId), context.previous)
+    onError: () => {
+      void queryClient.invalidateQueries({ queryKey: agendaKey(workspaceId) })
       toast.error('Le réglage de l’Agenda n’a pas pu être enregistré.')
     },
   })
+  return {
+    mutate: (patch: Partial<AgendaSettings>) => {
+      // Un rafraîchissement en route reviendrait avec l'ancien réglage : il est abandonné, sans
+      // remettre les données d'avant lui (ce qui effacerait aussi ce réglage).
+      void queryClient.cancelQueries({ queryKey: agendaKey(workspaceId) }, { revert: false })
+      apply(patch)
+      mutation.mutate(patch)
+    },
+  }
 }
