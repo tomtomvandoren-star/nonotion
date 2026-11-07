@@ -2,12 +2,21 @@
   "name": "@nonotion/mobile",
   "private": true,
   "scripts": {
-    "add:android": "cap add android",
-    "sync:android": "cap sync android"
+    "build": "pnpm --filter @nonotion/web build:mobile && cap sync",
+    "sync": "cap sync",
+    "icons": "pnpm --filter @nonotion/desktop icons && node scripts/icons.mjs",
+    "android": "cap open android",
+    "ios": "cap open ios"
   },
   "dependencies": {
+    "@aparajita/capacitor-secure-storage": "8.0.1",
     "@capacitor/android": "8.6.0",
-    "@capacitor/core": "8.6.0"
+    "@capacitor/app": "8.1.2",
+    "@capacitor/browser": "8.0.5",
+    "@capacitor/core": "8.6.0",
+    "@capacitor/ios": "8.6.0",
+    "@capacitor/local-notifications": "8.3.1",
+    "@capacitor/share": "8.0.3"
   },
   "devDependencies": {
     "@capacitor/cli": "8.6.0"

@@ -1,0 +1,143 @@
+name: Applications mobiles
+
+# Phase 10 : Nonotion pour Android et iOS (Capacitor 8). Chaque système construit l'application,
+# l'installe sur un émulateur (un simulateur pour iOS) et la lance : l'écran de connexion doit
+# s'afficher. L'APK à installer sur un téléphone est dans les artefacts (« nonotion-android »).
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - apps/web/**
+      - apps/mobile/**
+      - packages/shared/**
+      - pnpm-lock.yaml
+      - .github/workflows/mobile.yml
+
+concurrency:
+  group: mobile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Android (APK)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      # La clé de l'application, si elle est dans les secrets du dépôt (apps/mobile/README.md) :
+      # un APK signé par elle s'installe par-dessus le précédent. Sans elle, un APK de débogage.
+      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Dépendances
+        run: pnpm install --frozen-lockfile
+
+      - name: Application web pour mobile
+        run: pnpm --filter @nonotion/web build:mobile
+
+      - name: Projet Android
+        working-directory: apps/mobile
+        run: pnpm exec cap sync android
+
+      - name: Clé de l'application
+        if: env.HAS_KEYSTORE == 'true'
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: echo "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/nonotion.keystore"
+
+      - name: APK
+        working-directory: apps/mobile/android
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ env.HAS_KEYSTORE == 'true' && format('{0}/nonotion.keystore', runner.temp) || '' }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_PATH" ]; then
+            ./gradlew assembleRelease --no-daemon
+            cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/nonotion.apk"
+          else
+            ./gradlew assembleDebug --no-daemon
+            cp app/build/outputs/apk/debug/app-debug.apk "$RUNNER_TEMP/nonotion.apk"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nonotion-android
+          path: ${{ runner.temp }}/nonotion.apk
+          retention-days: 30
+
+      - name: Accélération de l'émulateur (KVM)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Essai sur l'émulateur Android
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bash apps/mobile/scripts/smoke-android.sh "${{ runner.temp }}/nonotion.apk" capture
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: capture-android
+          path: capture/
+          retention-days: 7
+
+  ios:
+    name: iOS (simulateur)
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      # Capacitor 8 demande Xcode 26.
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Dépendances
+        run: pnpm install --frozen-lockfile
+
+      - name: Application web pour mobile
+        run: pnpm --filter @nonotion/web build:mobile
+
+      - name: Projet iOS
+        working-directory: apps/mobile
+        run: pnpm exec cap sync ios
+
+      # Sans signature : un téléphone demande un compte Apple Developer (apps/mobile/README.md).
+      - name: Application pour le simulateur
+        working-directory: apps/mobile/ios/App
+        run: >
+          xcodebuild -quiet -project App.xcodeproj -scheme App -configuration Debug
+          -sdk iphonesimulator -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+
+      - name: Essai sur le simulateur iOS
+        run: bash apps/mobile/scripts/smoke-ios.sh apps/mobile/ios/App/build/Build/Products/Debug-iphonesimulator/App.app capture
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: capture-ios
+          path: capture/
+          retention-days: 7

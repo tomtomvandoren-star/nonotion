@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- L'écran de lancement (avant Android 12, qui affiche l'icône lui-même) : le logo sur le fond de l'application. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/splash_background" />
+    <item
+        android:width="112dp"
+        android:height="112dp"
+        android:drawable="@drawable/nonotion_logo"
+        android:gravity="center" />
+</layer-list>

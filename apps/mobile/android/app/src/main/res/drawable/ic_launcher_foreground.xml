@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Le premier plan de l'icône adaptative : le carré clair et le N de apps/desktop/app-icon.svg,
+     réduits dans la zone que le masque du téléphone laisse toujours voir (66 dp au centre). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.069444"
+        android:scaleY="0.069444"
+        android:translateX="18.4444"
+        android:translateY="18.4444">
+        <path
+            android:fillColor="#F7D9BC"
+            android:pathData="M272,152H752A120,120 0,0 1,872 272V752A120,120 0,0 1,752 872H272A120,120 0,0 1,152 752V272A120,120 0,0 1,272 152Z" />
+        <path
+            android:fillColor="#657868"
+            android:pathData="M352,724V300h72l176,280V300h72v424h-72L424,444v280z" />
+    </group>
+</vector>

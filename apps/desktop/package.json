@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "tauri": "tauri",
-    "icons": "tauri icon app-icon.svg",
+    "icons": "tauri icon app-icon.svg --ios-color \"#657868\"",
     "dev": "tauri dev",
     "build": "tauri build"
   },

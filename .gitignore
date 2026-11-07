@@ -6,6 +6,7 @@ apps/api/vendor/
 dist/
 dist-sandbox/
 dist-desktop/
+dist-mobile/
 *.tsbuildinfo
 
 # Secrets : le .env du serveur n'est jamais versionné (spec 1.6.9)
@@ -15,6 +16,7 @@ dist-desktop/
 !.env.production.example
 # Adresse publique de l'API pour l'application pour ordinateur (aucun secret).
 !apps/web/.env.desktop
+!apps/web/.env.mobile
 deploy.env
 
 # Front compilé copié dans le public Laravel par deploy.sh
@@ -45,9 +47,14 @@ Thumbs.db
 # Réglages locaux de Claude Code
 .claude/
 
-# Natif : généré (icônes Tauri, projet Android) ou compilé
+# Natif : généré (icônes Tauri) ou compilé. Les projets Android et iOS sont versionnés (phase 10),
+# sans ce que « cap sync » y recopie (le site compilé, la configuration) ni les icônes générées.
 apps/desktop/src-tauri/target/
 apps/desktop/src-tauri/icons/
 apps/desktop/src-tauri/gen/
-apps/mobile/android/
-apps/mobile/ios/
+apps/mobile/android/app/src/main/assets/public/
+apps/mobile/android/app/src/main/assets/capacitor.config.json
+apps/mobile/android/app/src/main/assets/capacitor.plugins.json
+apps/mobile/android/app/src/main/res/xml/config.xml
+apps/mobile/ios/App/App/capacitor.config.json
+apps/mobile/ios/App/App/config.xml

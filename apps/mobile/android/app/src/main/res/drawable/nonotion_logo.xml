@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- apps/desktop/app-icon.svg, pour l'écran de lancement. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="112dp"
+    android:height="112dp"
+    android:viewportWidth="1024"
+    android:viewportHeight="1024">
+    <path
+        android:fillColor="#657868"
+        android:pathData="M224,0H800A224,224 0,0 1,1024 224V800A224,224 0,0 1,800 1024H224A224,224 0,0 1,0 800V224A224,224 0,0 1,224 0Z" />
+    <path
+        android:fillColor="#F7D9BC"
+        android:pathData="M272,152H752A120,120 0,0 1,872 272V752A120,120 0,0 1,752 872H272A120,120 0,0 1,152 752V272A120,120 0,0 1,272 152Z" />
+    <path
+        android:fillColor="#657868"
+        android:pathData="M352,724V300h72l176,280V300h72v424h-72L424,444v280z" />
+</vector>
