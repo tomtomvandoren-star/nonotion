@@ -38,6 +38,9 @@ class Page extends Model
             'properties' => 'array',
             'is_favorite' => 'boolean',
             'version' => 'integer',
+            'remote_updated_at' => 'datetime',
+            'synced_at' => 'datetime',
+            'sync_conflict' => 'array',
         ];
     }
 

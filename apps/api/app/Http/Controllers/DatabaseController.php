@@ -8,6 +8,7 @@ use App\Http\Requests\Databases\UpdateDatabaseRequest;
 use App\Models\Database;
 use App\Models\Page;
 use App\Models\Workspace;
+use App\Support\Calendars\CalendarSync;
 use App\Support\Databases\Databases;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Gate;
@@ -67,6 +68,8 @@ class DatabaseController extends Controller
             'properties' => Databases::validateValues($database, $request->input('properties', [])),
             'position' => $request->input('position'),
         ]);
+        // Créée dans la base d'un agenda Google ou iCloud : elle y est créée aussi (spec 6.15).
+        CalendarSync::afterChange($row);
 
         return response()->json(['data' => Databases::row($row->refresh())], 201);
     }

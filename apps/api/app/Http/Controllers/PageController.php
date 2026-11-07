@@ -11,6 +11,7 @@ use App\Models\Database;
 use App\Models\Page;
 use App\Models\Workspace;
 use App\Support\BlockText;
+use App\Support\Calendars\CalendarSync;
 use App\Support\Databases\Databases;
 use App\Support\Databases\PageCopier;
 use App\Support\Databases\Recurrence;
@@ -105,6 +106,8 @@ class PageController extends Controller
 
             return $database === null ? null : Recurrence::afterUpdate($database, $page, $before);
         });
+        // Un événement d'un agenda Google ou iCloud : la modification part chez le fournisseur.
+        CalendarSync::afterChange($page);
 
         return response()->json([
             'data' => [...self::treeItem($page), 'properties' => (object) ($page->properties ?? [])],
@@ -142,6 +145,9 @@ class PageController extends Controller
                 'version' => (int) Page::query()->whereKey($page->id)->value('version'),
             ], 409);
         }
+
+        // La description d'un événement d'un agenda Google ou iCloud part aussi.
+        CalendarSync::afterChange($page);
 
         return response()->json(['data' => ['version' => $request->integer('version') + 1]]);
     }
@@ -214,6 +220,8 @@ class PageController extends Controller
         Page::query()
             ->whereIn('id', [$page->id, ...$page->descendantIds()])
             ->update(['deleted_at' => now()]);
+        // Un événement d'un agenda Google ou iCloud mis à la corbeille y est supprimé aussi.
+        CalendarSync::afterTrash($page);
 
         return response()->json(['status' => 'ok']);
     }
@@ -227,7 +235,12 @@ class PageController extends Controller
         if ($page->calendar_source_id === null) {
             return;
         }
-        $locked = array_values(CalendarSource::query()->find($page->calendar_source_id)?->property_map ?? []);
+        $source = CalendarSource::query()->find($page->calendar_source_id);
+        // Un agenda Google ou iCloud se modifie dans les deux sens (spec 6.15).
+        if ($source !== null && $source->writable && $source->kind !== CalendarSource::ICS) {
+            return;
+        }
+        $locked = array_values($source?->property_map ?? []);
         $touched = array_intersect($locked, array_map('strval', array_keys($request->input('properties', []))));
         $renamed = $request->has('title') && (string) $request->input('title') !== $page->title;
         if ($renamed || $touched !== []) {

@@ -131,6 +131,10 @@ class CalendarSourceController extends Controller
         return [
             'id' => $source->id,
             'database_id' => $source->database_id,
+            // ics (lien, lecture seule) | google | icloud (compte connecté, spec 6.15).
+            'kind' => $source->kind,
+            'account_id' => $source->account_id,
+            'writable' => $source->writable,
             'name' => $source->name,
             'color' => $source->color,
             'url_host' => $source->url_host,

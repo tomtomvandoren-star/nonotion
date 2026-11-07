@@ -45,4 +45,19 @@ return [
         'allow_private_hosts' => array_filter(explode(',', (string) env('ICS_ALLOW_PRIVATE_HOSTS', ''))),
     ],
 
+    /*
+    | Agendas des comptes connectés (spec 6.15). Google : identifiants OAuth dans config/services.php.
+    | iCloud (CalDAV) : seuls les serveurs d'Apple sont joints (allowed_hosts) ; caldav_url ne change
+    | que pour les tests.
+    | sync_every_minutes : le webcron synchronise au plus à ce rythme ; l'ouverture de l'Agenda, plus souvent.
+    */
+    'accounts' => [
+        'sync_every_minutes' => 15,
+        'sync_on_open_minutes' => 2,
+    ],
+    'icloud' => [
+        'caldav_url' => env('ICLOUD_CALDAV_URL', 'https://caldav.icloud.com'),
+        'allowed_hosts' => '/^([a-z0-9-]+\.)?icloud\.com$/i',
+    ],
+
 ];

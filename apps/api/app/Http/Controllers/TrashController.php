@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Page;
 use App\Models\Scopes\VisibleToCurrentUser;
 use App\Models\Workspace;
+use App\Support\Calendars\CalendarSync;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -68,8 +69,10 @@ class TrashController extends Controller
             }
             $page->restore();
         });
+        // Un événement d'un agenda Google ou iCloud restauré y est recréé.
+        CalendarSync::afterChange($page->refresh());
 
-        return response()->json(['data' => PageController::treeItem($page->refresh())]);
+        return response()->json(['data' => PageController::treeItem($page)]);
     }
 
     /** Suppression définitive depuis la corbeille ; les sous-pages partent avec (clé étrangère en cascade). */

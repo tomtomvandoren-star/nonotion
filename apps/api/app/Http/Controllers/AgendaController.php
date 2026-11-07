@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\Calendars\UpdateAgendaRequest;
+use App\Models\CalendarAccount;
 use App\Models\CalendarSource;
 use App\Models\Workspace;
 use App\Support\Calendars\Agenda;
+use App\Support\Calendars\Connectors\GoogleOAuth;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Gate;
 
@@ -49,6 +51,10 @@ class AgendaController extends Controller
             'settings' => [...$settings, 'colors' => (object) $settings['colors']],
             'databases' => $databases,
             'sources' => $sources->map(fn (CalendarSource $source) => CalendarSourceController::present($source))->all(),
+            'accounts' => CalendarAccount::query()->where('workspace_id', $workspace->id)->orderBy('created_at')->get()
+                ->map(fn (CalendarAccount $account) => CalendarAccountController::present($account))->all(),
+            // « Connecter Google Agenda » n'est proposé que si le serveur a ses identifiants OAuth.
+            'google_available' => GoogleOAuth::configured(),
         ];
     }
 }

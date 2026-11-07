@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\TrashController;
 use App\Support\Calendars\CalendarImporter;
+use App\Support\Calendars\CalendarSync;
 use App\Support\Heartbeat;
 use Illuminate\Support\Facades\Schedule;
 
@@ -24,3 +25,9 @@ Schedule::call(fn () => TrashController::purgeExpired())
 Schedule::call(fn () => CalendarImporter::syncDue())
     ->everyMinute()
     ->name('sync-calendars');
+
+// Agendas Google et iCloud (spec 6.15) : toutes les 15 minutes, dans les deux sens (ce qui n'a pas
+// pu partir chez le fournisseur repart ici).
+Schedule::call(fn () => CalendarSync::syncDue())
+    ->everyMinute()
+    ->name('sync-connected-calendars');

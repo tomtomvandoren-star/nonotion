@@ -171,6 +171,10 @@ class CalendarImporter
      */
     public function sync(CalendarSource $source, bool $force = false): array
     {
+        // Un agenda d'un compte connecté (Google, iCloud) a son propre moteur (spec 6.15).
+        if ($source->kind !== CalendarSource::ICS) {
+            return app(CalendarSync::class)->sync($source);
+        }
         try {
             try {
                 $url = $source->url();
@@ -347,6 +351,7 @@ class CalendarImporter
     {
         $importer = app(self::class);
         CalendarSource::query()
+            ->where('kind', CalendarSource::ICS)
             ->where('mode', CalendarSource::SUBSCRIPTION)
             ->where(fn ($query) => $query->whereNull('next_sync_at')->orWhere('next_sync_at', '<=', now()))
             ->orderBy('next_sync_at')

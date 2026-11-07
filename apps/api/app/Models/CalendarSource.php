@@ -13,12 +13,21 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
 
 /**
- * Un agenda importé par lien ICS (spec 6.9). Le lien est un secret : chiffré (Crypt, APP_KEY),
- * jamais renvoyé au client ni écrit dans les journaux ; seul son domaine (url_host) s'affiche.
+ * Un agenda importé par lien ICS (spec 6.9), ou un agenda d'un compte Google ou iCloud connecté
+ * (spec 6.15, `kind`, `account_id`, `remote_id`), synchronisé dans les deux sens s'il est `writable`.
+ * Le lien est un secret : chiffré (Crypt, APP_KEY), jamais renvoyé au client ni écrit dans les
+ * journaux ; seul son domaine (url_host) s'affiche (pour un compte : le fournisseur et l'adresse).
  *
  * @property string $id
  * @property string $workspace_id
  * @property string $database_id
+ * @property string $kind ics | google | icloud
+ * @property string|null $account_id
+ * @property string|null $remote_id
+ * @property bool $writable
+ * @property string|null $push_channel_id
+ * @property string|null $push_resource_id
+ * @property Carbon|null $push_expires_at
  * @property string $name
  * @property string $color
  * @property string $url_host
@@ -36,7 +45,7 @@ use Illuminate\Support\Facades\Crypt;
  * @property int $events_count
  */
 #[Fillable(['workspace_id', 'database_id', 'name', 'color', 'mode', 'property_map', 'time_zone'])]
-#[Hidden(['url_encrypted', 'url_hash', 'etag', 'last_modified'])]
+#[Hidden(['url_encrypted', 'url_hash', 'etag', 'last_modified', 'push_channel_id', 'push_resource_id'])]
 #[ScopedBy([VisibleToCurrentUser::class])]
 class CalendarSource extends Model
 {
@@ -46,6 +55,18 @@ class CalendarSource extends Model
 
     public const ONE_SHOT = 'one_shot';
 
+    public const ICS = 'ics';
+
+    public const GOOGLE = 'google';
+
+    public const ICLOUD = 'icloud';
+
+    /** Par défaut, un agenda par lien, en lecture seule (comme la base de données). */
+    protected $attributes = [
+        'kind' => self::ICS,
+        'writable' => false,
+    ];
+
     protected function casts(): array
     {
         return [
@@ -54,6 +75,8 @@ class CalendarSource extends Model
             'next_sync_at' => 'datetime',
             'failure_count' => 'integer',
             'events_count' => 'integer',
+            'writable' => 'boolean',
+            'push_expires_at' => 'datetime',
         ];
     }
 
@@ -61,6 +84,12 @@ class CalendarSource extends Model
     public function database(): BelongsTo
     {
         return $this->belongsTo(Database::class);
+    }
+
+    /** @return BelongsTo<CalendarAccount, $this> */
+    public function account(): BelongsTo
+    {
+        return $this->belongsTo(CalendarAccount::class);
     }
 
     /** Le lien en clair : uniquement pour le télécharger, jamais pour l'afficher ou le journaliser. */

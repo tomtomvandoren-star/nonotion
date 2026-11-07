@@ -14,6 +14,14 @@ return [
     |
     */
 
+    // Google Agenda (spec 6.15) : un client OAuth « Application Web » du projet Google Cloud du
+    // propriétaire. L'adresse de retour par défaut : APP_URL/api/integrations/google/callback.
+    'google' => [
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_REDIRECT_URI'),
+    ],
+
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
     ],
