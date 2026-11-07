@@ -289,7 +289,9 @@ test.describe('6.11 Vue Board', () => {
         touchPoints: type === 'touchEnd' ? [] : [{ x, y }],
       })
     const start = { x: card.x + card.width / 2, y: card.y + card.height / 2 }
-    const end = { x: target.x + target.width / 2, y: target.y + 60 }
+    // Dans le premier quart de la colonne : près du bord du Board, il défile de lui-même pendant le
+    // glisser (le doigt se retrouverait au-dessus de la colonne suivante).
+    const end = { x: target.x + target.width / 4, y: target.y + 60 }
     await touch('touchStart', start.x, start.y)
     await page.waitForTimeout(400)
     for (let step = 1; step <= 12; step++)
