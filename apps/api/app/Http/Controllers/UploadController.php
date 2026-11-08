@@ -8,6 +8,7 @@ use App\Models\Upload;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Les fichiers des blocs Image, Vidéo, Audio et Fichier d'une page. Chaque fichier est rangé dans
@@ -21,6 +22,14 @@ class UploadController extends Controller
         Gate::authorize('update', $page);
 
         $file = $request->file('file');
+
+        $quotaMb = (int) config('nonotion.uploads.quota_mb');
+        $used = (int) Upload::query()->where('workspace_id', $page->workspace_id)->sum('size');
+        if ($used + $file->getSize() > $quotaMb * 1024 * 1024) {
+            $limit = $quotaMb % 1024 === 0 ? ($quotaMb / 1024).' Go' : "{$quotaMb} Mo";
+            throw ValidationException::withMessages(['file' => "Cet espace de travail a atteint sa limite de {$limit} de fichiers."]);
+        }
+
         $original = mb_substr(trim($file->getClientOriginalName()) ?: 'fichier', 0, 255);
         $id = (string) Str::ulid();
         $path = $file->storeAs("{$page->workspace_id}/".strtolower($id), Upload::safeName($original), 'uploads');

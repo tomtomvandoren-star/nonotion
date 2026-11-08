@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Support\Heartbeat;
+use App\Support\MailCheck;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -11,7 +12,7 @@ use Throwable;
 
 /**
  * Vérifie en une commande ce que la phase 0 doit confirmer sur l'hébergement (spec 1.8) :
- * PHP, extensions, limites, MariaDB, droits d'écriture, cron et connexions HTTPS sortantes.
+ * PHP, extensions, limites, MariaDB, droits d'écriture, cron, connexions HTTPS sortantes et SMTP.
  * À lancer en SSH sur le serveur : php artisan nonotion:hosting-check
  */
 #[Signature('nonotion:hosting-check {--skip-network : Ne pas tester les connexions sortantes}')]
@@ -48,6 +49,7 @@ class HostingCheck extends Command
         if (! $this->option('skip-network')) {
             $this->components->info('Connexions sortantes (import ICS)');
             $this->checkOutboundHttps();
+            $this->checkSmtp();
         }
 
         if ($this->failed) {
@@ -151,6 +153,17 @@ class HostingCheck extends Command
                 ? (string) $from
                 : "« {$from} » n’est pas une adresse complète : mettre celle de la boîte, par exemple ".config('mail.mailers.smtp.username'), $valid);
         }
+    }
+
+    /** Le serveur SMTP accepte-t-il la connexion et les identifiants ? Sans envoyer d'e-mail. */
+    private function checkSmtp(): void
+    {
+        if (config('mail.default') !== 'smtp' || ! config('mail.mailers.smtp.username')) {
+            return;
+        }
+        $server = config('mail.mailers.smtp.host').':'.config('mail.mailers.smtp.port');
+        $problem = MailCheck::smtp();
+        $this->report("Serveur d’e-mails ({$server})", $problem ?? 'connexion et identifiants acceptés', $problem === null);
     }
 
     private function checkOutboundHttps(): void

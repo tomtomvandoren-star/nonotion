@@ -32,9 +32,12 @@ return [
     /*
     | Fichiers envoyés dans les pages (blocs Image, Vidéo, Audio, Fichier) : taille maximale en Mo.
     | PHP doit l'accepter aussi (upload_max_filesize et post_max_size : 300 Mo chez Infomaniak).
+    | quota_mb : la place que prennent au plus les fichiers d'un espace de travail. Les inscriptions
+    | sont ouvertes : un compte ne peut pas remplir à lui seul l'hébergement.
     */
     'uploads' => [
         'max_mb' => (int) env('UPLOAD_MAX_MB', 100),
+        'quota_mb' => (int) env('UPLOAD_QUOTA_MB', 1024),
     ],
 
     /*

@@ -16,6 +16,8 @@ function generalError(error: unknown, fields: string[]): string | undefined {
   if (!error) return undefined
   if (error instanceof ApiError) {
     if (fields.some((field) => error.fieldError(field))) return undefined
+    // 503 : le serveur répond, mais un service manque (l'envoi d'e-mails…) ; il dit lequel.
+    if (error.status === 503 && error.message) return error.message
     return error.status >= 500
       ? 'Le serveur ne répond pas. Réessayez dans un instant.'
       : error.message

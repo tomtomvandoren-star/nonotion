@@ -77,6 +77,22 @@ it('refuse un fichier trop lourd', function () {
     expect(Upload::query()->count())->toBe(0);
 });
 
+it('un espace de travail ne dépasse pas sa place pour les fichiers', function () {
+    config(['nonotion.uploads.quota_mb' => 1]);
+    $page = mediaPage(signIn());
+
+    upload($page, UploadedFile::fake()->create('a.pdf', 600, 'application/pdf'))->assertCreated();
+    upload($page, UploadedFile::fake()->create('b.pdf', 600, 'application/pdf'))
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.file.0', 'Cet espace de travail a atteint sa limite de 1 Mo de fichiers.');
+
+    // Un autre compte a sa propre place.
+    $bob = createAccount('Bob');
+    Sanctum::actingAs($bob);
+    upload(mediaPage(workspaceOf($bob)), UploadedFile::fake()->create('c.pdf', 600, 'application/pdf'))
+        ->assertCreated();
+});
+
 it('n’envoie rien dans la page d’un autre utilisateur', function () {
     $alicePage = mediaPage(signIn('Alice'));
     Sanctum::actingAs(createAccount('Bob'));
