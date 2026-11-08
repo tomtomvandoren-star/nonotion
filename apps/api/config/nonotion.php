@@ -30,6 +30,24 @@ return [
     ],
 
     /*
+    | Fichiers envoyés dans les pages (blocs Image, Vidéo, Audio, Fichier) : taille maximale en Mo.
+    | PHP doit l'accepter aussi (upload_max_filesize et post_max_size : 300 Mo chez Infomaniak).
+    */
+    'uploads' => [
+        'max_mb' => (int) env('UPLOAD_MAX_MB', 100),
+    ],
+
+    /*
+    | Aperçu d'un lien web (bloc « Aperçu de lien ») : la page est lue avec la même protection SSRF
+    | que les agendas ICS (5 Mo au plus) ; le résultat est gardé un jour.
+    */
+    'link_preview' => [
+        'timeout' => 8,
+        'max_bytes' => 5 * 1024 * 1024,
+        'cache_hours' => 24,
+    ],
+
+    /*
     | Import d'agendas par lien ICS (spec 6.9).
     | allow_private_hosts : adresses locales autorisées malgré la protection SSRF (« 127.0.0.1:8765 »),
     | pour les tests de bout en bout seulement ; jamais prises en compte en production.

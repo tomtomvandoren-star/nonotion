@@ -47,6 +47,16 @@ return [
             'report' => false,
         ],
 
+        // Les fichiers envoyés dans les pages, servis directement par le serveur web (spec 1.4).
+        'uploads' => [
+            'driver' => 'local',
+            'root' => public_path('uploads'),
+            'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/uploads',
+            'visibility' => 'public',
+            'throw' => true,
+            'report' => false,
+        ],
+
         's3' => [
             'driver' => 's3',
             'key' => env('AWS_ACCESS_KEY_ID'),

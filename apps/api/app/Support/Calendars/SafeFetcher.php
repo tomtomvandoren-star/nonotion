@@ -3,6 +3,7 @@
 namespace App\Support\Calendars;
 
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -11,6 +12,8 @@ use Illuminate\Support\Facades\Http;
  * sur l'adresse vérifiée (CURLOPT_RESOLVE) : une autre réponse DNS au moment de se connecter ne
  * change rien. Les redirections sont suivies à la main, vérifiées à chaque fois (3 au plus).
  * Le lien est un secret : il n'apparaît dans aucun message d'erreur.
+ *
+ * Lit aussi, avec les mêmes protections, le début d'une page web pour son aperçu (fetchPage).
  */
 class SafeFetcher
 {
@@ -47,8 +50,88 @@ class SafeFetcher
      */
     public function fetch(string $url, ?string $etag = null, ?string $lastModified = null): array
     {
-        $url = self::normalize($url);
         $config = config('nonotion.ics');
+        [$response] = $this->request(self::normalize($url), array_filter([
+            'Accept' => 'text/calendar, */*;q=0.5',
+            'User-Agent' => 'Nonotion (import d’agenda)',
+            'If-None-Match' => $etag,
+            'If-Modified-Since' => $lastModified,
+        ]), $config['timeout'], $config['max_bytes'], [
+            'too_big' => 'Cet agenda dépasse 10 Mo.',
+            'silent' => 'Le serveur de l’agenda ne répond pas.',
+        ]);
+
+        $status = $response->status();
+        if ($status === 304) {
+            return ['body' => null, 'etag' => $etag, 'last_modified' => $lastModified];
+        }
+        if (in_array($status, [401, 403], true)) {
+            throw new FetchFailed('Le lien n’est plus valide ou a été révoqué.');
+        }
+        if ($status === 404 || $status === 410) {
+            throw new FetchFailed('Aucun agenda à cette adresse (le lien a peut-être changé).');
+        }
+        if (! $response->successful()) {
+            throw new FetchFailed("Le serveur de l’agenda a répondu par une erreur ({$status}).");
+        }
+
+        $body = $response->body();
+        if (strlen($body) > $config['max_bytes']) {
+            throw new FetchFailed('Cet agenda dépasse 10 Mo.');
+        }
+        if (! str_contains(substr($body, 0, 2048), 'BEGIN:VCALENDAR')) {
+            throw new FetchFailed('Ce lien ne renvoie pas un agenda au format iCalendar (.ics).');
+        }
+
+        return [
+            'body' => $body,
+            'etag' => $response->header('ETag') ?: null,
+            'last_modified' => $response->header('Last-Modified') ?: null,
+        ];
+    }
+
+    /**
+     * Une page web (max_bytes au plus), son adresse après redirections et son type.
+     *
+     * @return array{url: string, body: string, type: string}
+     */
+    public function fetchPage(string $url): array
+    {
+        $config = config('nonotion.link_preview');
+        [$response, $finalUrl] = $this->request($url, [
+            'Accept' => 'text/html, application/xhtml+xml;q=0.9, */*;q=0.5',
+            'Accept-Language' => 'fr, en;q=0.8',
+            'User-Agent' => 'Mozilla/5.0 (compatible; Nonotion/1.0; aperçu de lien)',
+        ], $config['timeout'], $config['max_bytes'], [
+            'too_big' => 'Cette page est trop lourde pour un aperçu.',
+            'silent' => 'Ce site ne répond pas.',
+        ]);
+
+        $status = $response->status();
+        if (! $response->successful()) {
+            throw new FetchFailed($status === 404 || $status === 410
+                ? 'Aucune page à cette adresse.'
+                : "Ce site a répondu par une erreur ({$status}).");
+        }
+
+        return [
+            'url' => $finalUrl,
+            'body' => $response->body(),
+            'type' => strtolower($response->header('Content-Type')),
+        ];
+    }
+
+    /**
+     * Une requête GET vers une adresse vérifiée, redirections suivies à la main. Au-delà de
+     * maxBytes, le téléchargement s'arrête (erreur « too_big »).
+     *
+     * @param  array<string, string>  $headers
+     * @param  array{too_big: string, silent: string}  $messages
+     * @return array{0: Response, 1: string}
+     */
+    private function request(string $url, array $headers, int $timeout, int $maxBytes, array $messages): array
+    {
+        $maxRedirects = config('nonotion.ics.max_redirects');
 
         for ($redirects = 0; ; $redirects++) {
             [$host, $port, $ip] = $this->checkedTarget($url);
@@ -59,70 +142,40 @@ class SafeFetcher
                 $response = Http::withOptions([
                     'allow_redirects' => false,
                     'curl' => [CURLOPT_RESOLVE => ["{$host}:{$port}:{$resolve}"]],
-                    // Au-delà de 10 Mo, on arrête le téléchargement.
-                    'progress' => function ($total, $downloaded) use (&$received, $config) {
+                    'progress' => function ($total, $downloaded) use (&$received, $maxBytes, $messages) {
                         $received = $downloaded;
-                        if ($total > $config['max_bytes'] || $downloaded > $config['max_bytes']) {
-                            throw new FetchFailed('Cet agenda dépasse 10 Mo.');
+                        if ($total > $maxBytes || $downloaded > $maxBytes) {
+                            throw new FetchFailed($messages['too_big']);
                         }
                     },
                 ])
-                    ->timeout($config['timeout'])
+                    ->timeout($timeout)
                     ->connectTimeout(5)
-                    ->withHeaders(array_filter([
-                        'Accept' => 'text/calendar, */*;q=0.5',
-                        'User-Agent' => 'Nonotion (import d’agenda)',
-                        'If-None-Match' => $etag,
-                        'If-Modified-Since' => $lastModified,
-                    ]))
+                    ->withHeaders($headers)
                     ->get($url);
             } catch (FetchFailed $e) {
                 throw $e;
             } catch (ConnectionException) {
-                throw new FetchFailed('Le serveur de l’agenda ne répond pas.');
+                throw new FetchFailed($messages['silent']);
             } catch (\Throwable $e) {
                 // Le message d'une erreur cURL contient l'adresse : on ne le reprend pas.
                 if ($e->getPrevious() instanceof FetchFailed) {
                     throw $e->getPrevious();
                 }
-                throw new FetchFailed($received > 0 ? 'Cet agenda dépasse 10 Mo.' : 'Le serveur de l’agenda ne répond pas.');
+                throw new FetchFailed($received > 0 ? $messages['too_big'] : $messages['silent']);
             }
 
             $status = $response->status();
             if (in_array($status, [301, 302, 303, 307, 308], true) && $response->header('Location') !== '') {
-                if ($redirects >= $config['max_redirects']) {
+                if ($redirects >= $maxRedirects) {
                     throw new FetchFailed('Ce lien redirige trop de fois.');
                 }
-                $url = self::resolveLocation($url, $response->header('Location'));
+                $url = self::resolveUrl($url, $response->header('Location'));
 
                 continue;
             }
-            if ($status === 304) {
-                return ['body' => null, 'etag' => $etag, 'last_modified' => $lastModified];
-            }
-            if (in_array($status, [401, 403], true)) {
-                throw new FetchFailed('Le lien n’est plus valide ou a été révoqué.');
-            }
-            if ($status === 404 || $status === 410) {
-                throw new FetchFailed('Aucun agenda à cette adresse (le lien a peut-être changé).');
-            }
-            if (! $response->successful()) {
-                throw new FetchFailed("Le serveur de l’agenda a répondu par une erreur ({$status}).");
-            }
 
-            $body = $response->body();
-            if (strlen($body) > $config['max_bytes']) {
-                throw new FetchFailed('Cet agenda dépasse 10 Mo.');
-            }
-            if (! str_contains(substr($body, 0, 2048), 'BEGIN:VCALENDAR')) {
-                throw new FetchFailed('Ce lien ne renvoie pas un agenda au format iCalendar (.ics).');
-            }
-
-            return [
-                'body' => $body,
-                'etag' => $response->header('ETag') ?: null,
-                'last_modified' => $response->header('Last-Modified') ?: null,
-            ];
+            return [$response, $url];
         }
     }
 
@@ -198,7 +251,8 @@ class SafeFetcher
         return array_values(array_filter($ips));
     }
 
-    private static function resolveLocation(string $base, string $location): string
+    /** Une adresse (absolue, « //hôte/… », « /chemin » ou relative) lue depuis la page base. */
+    public static function resolveUrl(string $base, string $location): string
     {
         if (preg_match('#^https?://#i', $location)) {
             return $location;

@@ -116,7 +116,8 @@ class HostingCheck extends Command
 
     private function checkWritableDirectories(): void
     {
-        foreach ([storage_path(), base_path('bootstrap/cache')] as $directory) {
+        // public/uploads : les fichiers envoyés dans les pages (blocs Média).
+        foreach ([storage_path(), base_path('bootstrap/cache'), public_path('uploads')] as $directory) {
             $this->report('Écriture dans '.basename($directory), is_writable($directory) ? 'ok' : 'refusée', is_writable($directory));
         }
     }

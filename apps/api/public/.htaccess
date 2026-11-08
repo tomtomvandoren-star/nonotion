@@ -22,6 +22,10 @@ DirectoryIndex index.html
     RewriteCond %{HTTP:x-xsrf-token} .
     RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
 
+    # Jamais la liste des fichiers d'un dossier de uploads/ : leurs adresses sont secrètes.
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^uploads(/|$) - [R=404,L]
+
     # Redirect Trailing Slashes If Not A Folder...
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_URI} (.+)/$
@@ -53,6 +57,18 @@ DirectoryIndex index.html
     # Les fichiers de assets/ ont un hash dans leur nom : cache d'un an.
     <If "%{REQUEST_URI} =~ m#^/assets/#">
         Header set Cache-Control "public, max-age=31536000, immutable"
+    </If>
+
+    # Fichiers envoyés par les utilisateurs : jamais exécutés comme une page de Nonotion. Ouverts
+    # seuls (nouvel onglet), ils sont isolés (sandbox : ni script ni accès à la session) ; les PDF
+    # gardent la visionneuse du navigateur, qui ne fonctionne pas isolée. Chaque fichier a une
+    # adresse unique qui ne change jamais : cache d'un an.
+    <If "%{REQUEST_URI} =~ m#^/uploads/#">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+        Header always set Cross-Origin-Resource-Policy "cross-origin"
+    </If>
+    <If "%{REQUEST_URI} =~ m#^/uploads/# && %{REQUEST_URI} !~ m#\.pdf$#i">
+        Header always set Content-Security-Policy "default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'; sandbox"
     </If>
 
     # Le point d'entrée doit toujours être revalidé pour récupérer le dernier déploiement.

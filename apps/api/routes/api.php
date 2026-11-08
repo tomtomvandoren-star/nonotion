@@ -8,10 +8,12 @@ use App\Http\Controllers\CalendarSourceController;
 use App\Http\Controllers\CronController;
 use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\HealthController;
+use App\Http\Controllers\LinkPreviewController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\PropertyController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\TrashController;
+use App\Http\Controllers\UploadController;
 use App\Http\Controllers\ViewController;
 use Illuminate\Support\Facades\Route;
 
@@ -56,6 +58,7 @@ Route::middleware(['auth:sanctum', 'throttle:240,1'])->group(function () {
     Route::get('/pages/{page}', [PageController::class, 'show']);
     Route::patch('/pages/{page}', [PageController::class, 'update']);
     Route::put('/pages/{page}/content', [PageController::class, 'updateContent']);
+    Route::post('/pages/{page}/files', [UploadController::class, 'store']);
     Route::post('/pages/{page}/move', [PageController::class, 'move']);
     Route::post('/pages/{page}/duplicate', [PageController::class, 'duplicate']);
     Route::delete('/pages/{page}', [PageController::class, 'destroy']);
@@ -81,6 +84,9 @@ Route::middleware(['auth:sanctum', 'throttle:240,1'])->group(function () {
     Route::patch('/calendar-sources/{source}', [CalendarSourceController::class, 'update']);
     Route::delete('/calendar-sources/{source}', [CalendarSourceController::class, 'destroy']);
 });
+
+// Aperçu d'un lien web : chaque appel lit une page distante (gardée un jour), d'où une limite basse.
+Route::post('/link-preview', LinkPreviewController::class)->middleware(['auth:sanctum', 'throttle:30,1']);
 
 // Agendas par lien ICS (spec 6.9) : chaque appel télécharge un fichier distant, d'où une limite basse.
 Route::middleware(['auth:sanctum', 'throttle:20,1'])->group(function () {
