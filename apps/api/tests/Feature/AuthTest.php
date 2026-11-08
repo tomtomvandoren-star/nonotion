@@ -86,6 +86,19 @@ it('répond 401 en JSON sans jeton, même sans en-tête Accept', function () {
     $this->get('/api/auth/me')->assertUnauthorized()->assertJson(['message' => 'Unauthenticated.']);
 });
 
+it('un e-mail parti efface l’échec retenu pour la vérification de l’hébergement', function () {
+    Notification::fake();
+    $user = createAccount('Lou');
+    MailCheck::rememberFailure(new RuntimeException('ancien échec'));
+
+    // Une adresse inconnue n'envoie rien : l'échec reste.
+    $this->postJson('/api/auth/forgot-password', ['email' => 'inconnu@example.test'])->assertOk();
+    expect(MailCheck::lastFailure())->not->toBeNull();
+
+    $this->postJson('/api/auth/forgot-password', ['email' => $user->email])->assertOk();
+    expect(MailCheck::lastFailure())->toBeNull();
+});
+
 it('envoie un lien de réinitialisation vers le front, sans révéler si le compte existe', function () {
     Notification::fake();
     $user = createAccount('Dora');

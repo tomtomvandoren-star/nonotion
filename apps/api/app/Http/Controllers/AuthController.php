@@ -88,7 +88,11 @@ class AuthController extends Controller
     {
         try {
             // Même réponse que le compte existe ou non : on ne révèle pas quelles adresses sont inscrites.
-            Password::sendResetLink(['email' => $request->input('email')]);
+            $status = Password::sendResetLink(['email' => $request->input('email')]);
+            // Un e-mail vient de partir : l'ancien échec n'a plus à figurer dans la vérification.
+            if ($status === Password::RESET_LINK_SENT) {
+                MailCheck::forgetFailure();
+            }
         } catch (TransportExceptionInterface|MimeExceptionInterface $e) {
             // Serveur SMTP injoignable, ou adresse d'expédition mal réglée (MAIL_FROM_ADDRESS) : le lien
             // n'est pas parti. On retire le jeton créé, sinon la limite d'un envoi par minute ferait

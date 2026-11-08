@@ -26,6 +26,11 @@ class MailCheck
         ], now()->addDays(7));
     }
 
+    public static function forgetFailure(): void
+    {
+        Cache::forget(self::LAST_FAILURE);
+    }
+
     /** @return array{at: string, message: string}|null */
     public static function lastFailure(): ?array
     {
