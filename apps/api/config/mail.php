@@ -68,7 +68,9 @@ return [
 
         'sendmail' => [
             'transport' => 'sendmail',
-            'path' => env('MAIL_SENDMAIL_PATH', '/usr/sbin/sendmail -bs -i'),
+            // « -t » (destinataires lus dans le message) : la forme que tous les sendmail comprennent,
+            // celui de l'hébergement mutualisé compris (MAIL_MAILER=sendmail, sans mot de passe).
+            'path' => env('MAIL_SENDMAIL_PATH', '/usr/sbin/sendmail -t -i'),
         ],
 
         'log' => [
