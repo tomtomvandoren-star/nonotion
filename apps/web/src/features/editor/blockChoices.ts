@@ -32,7 +32,7 @@ export type BlockChoice = {
 
 /*
  * L'ordre compte : c'est celui du menu, et à égalité de pertinence le premier gagne
- * (« /titre » doit donner Titre 1). Les groupes Médias et Bases de données arrivent avec leurs phases.
+ * (« /titre » doit donner Titre 1). Les groupes Média et Bases de données sont dans BlockEditor.
  */
 export const BLOCK_CHOICES: BlockChoice[] = [
   {

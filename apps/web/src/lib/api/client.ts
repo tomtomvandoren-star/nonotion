@@ -71,7 +71,9 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const token = getToken()
   const headers: Record<string, string> = { Accept: 'application/json' }
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  // Un fichier part tel quel (multipart) : le navigateur écrit lui-même l'en-tête Content-Type.
+  const form = body instanceof FormData
+  if (body !== undefined && !form) headers['Content-Type'] = 'application/json'
   if (token) headers.Authorization = `Bearer ${token}`
 
   const write = method !== 'GET'
@@ -79,7 +81,7 @@ export async function apiRequest<T>(
   const response = await fetch(apiUrl(path), {
     method,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : form ? body : JSON.stringify(body),
     keepalive,
     signal,
   }).finally(() => {

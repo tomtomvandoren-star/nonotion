@@ -1,13 +1,15 @@
 import { BlockNoteSchema, createHeadingBlockSpec, defaultBlockSpecs } from '@blocknote/core'
 import { createDatabaseBlockSpec } from '@/features/databases/DatabaseBlock'
 import { createCalloutBlockSpec } from './Callout'
+import { createBookmarkBlockSpec } from './media/Bookmark'
+import { createVideoBlockSpec } from './media/VideoBlock'
 import { createPageLinkBlockSpec } from './PageLink'
 
 /**
  * Les blocs de la phase 2 (spec 9) : texte, titres, listes, to-do, liste dépliable, citation,
- * séparateur, code et encadré ; et la base de données en ligne (phase 3). Les blocs médias (image, fichier…) et le tableau ne sont pas
- * proposés tant que l'envoi de fichiers n'existe pas : un bloc qui ne marche pas n'a rien à faire
- * dans le menu.
+ * séparateur, code et encadré ; la base de données en ligne (phase 3) ; le groupe « Média » :
+ * image, vidéo (fichier, YouTube, Vimeo), audio, fichier et aperçu d'un lien web. Le tableau de
+ * BlockNote n'est pas proposé : les bases de données en tiennent lieu.
  */
 export const schema = BlockNoteSchema.create({
   blockSpecs: {
@@ -24,6 +26,11 @@ export const schema = BlockNoteSchema.create({
     callout: createCalloutBlockSpec(),
     database: createDatabaseBlockSpec(),
     pageLink: createPageLinkBlockSpec(),
+    image: defaultBlockSpecs.image,
+    video: createVideoBlockSpec(),
+    audio: defaultBlockSpecs.audio,
+    file: defaultBlockSpecs.file,
+    bookmark: createBookmarkBlockSpec(),
   },
 })
 

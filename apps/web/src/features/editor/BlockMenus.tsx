@@ -9,6 +9,12 @@ import {
   CreateLinkButton,
   DragHandleButton,
   DragHandleMenu,
+  FileCaptionButton,
+  FileDeleteButton,
+  FileDownloadButton,
+  FilePreviewButton,
+  FileRenameButton,
+  FileReplaceButton,
   FormattingToolbar,
   RemoveBlockItem,
   SideMenu,
@@ -134,6 +140,13 @@ export function SelectionToolbar() {
       {mobile && <HistoryButton key="undoButton" direction="undo" />}
       {mobile && <HistoryButton key="redoButton" direction="redo" />}
       <BlockTypeSelect key="blockTypeSelect" items={BLOCK_TYPE_ITEMS} />
+      {/* Image, vidéo, audio, fichier sélectionnés : légende, remplacer, renommer, télécharger… */}
+      <FileCaptionButton key="fileCaptionButton" />
+      <FileReplaceButton key="replaceFileButton" />
+      <FileRenameButton key="fileRenameButton" />
+      <FileDownloadButton key="fileDownloadButton" />
+      <FilePreviewButton key="filePreviewButton" />
+      <FileDeleteButton key="fileDeleteButton" />
       <CreateLinkButton key="createLinkButton" />
       <BasicTextStyleButton basicTextStyle="bold" key="boldStyleButton" />
       <BasicTextStyleButton basicTextStyle="italic" key="italicStyleButton" />

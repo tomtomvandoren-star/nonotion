@@ -30,6 +30,7 @@ import type { NonotionBlock } from '@/features/editor/schema'
 import { consumeTitleFocus, requestTitleFocus } from '@/features/pages/useNewPage'
 import { ApiError } from '@/lib/api/client'
 import { createDatabase } from '@/lib/api/databases'
+import { uploadFile } from '@/lib/api/media'
 import { createPage, savePageContent } from '@/lib/api/pages'
 import { useDebouncedSave } from '@/lib/useDebouncedSave'
 import { cn } from '@/lib/utils'
@@ -415,6 +416,19 @@ function PageBody({
     },
   }
 
+  // Un fichier refusé par le serveur (trop lourd…) : son message, tel quel.
+  const upload = (file: File) =>
+    uploadFile(page.id, file)
+      .then((stored) => stored.url)
+      .catch((error: unknown) => {
+        toast.error(
+          error instanceof ApiError
+            ? (error.fieldError('file') ?? error.message)
+            : 'Le fichier n’a pas pu être envoyé.',
+        )
+        throw error
+      })
+
   return (
     <>
       <div className="mt-2 min-h-40" onBlur={save.flush}>
@@ -427,6 +441,7 @@ function PageBody({
             onExitTop={onExitTop}
             databases={databases}
             pages={pages}
+            uploadFile={upload}
           />
         </Suspense>
       </div>

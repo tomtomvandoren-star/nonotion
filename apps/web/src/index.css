@@ -157,6 +157,12 @@
   text-decoration-color: var(--text-muted);
   text-underline-offset: 2px;
 }
+/* L'aperçu d'un lien est une carte, pas un lien souligné. */
+.nn-editor .bn-editor a.nn-bookmark,
+.nn-editor .bn-editor a.nn-bookmark:visited {
+  color: var(--color-foreground);
+  text-decoration: none;
+}
 
 /* Titres 1, 2, 3 : 30, 24 et 20 px (le niveau 1, par défaut, n'a pas d'attribut data-level). */
 .nn-editor [data-content-type='heading'] {
@@ -395,4 +401,13 @@
   border-radius: 2px;
   background-color: var(--accent);
   pointer-events: none;
+}
+
+/* Pendant l'envoi d'un fichier (blocs Média), BlockNote écrit « Loading... » : en français ici. */
+.nn-editor .bn-file-loading-preview {
+  font-size: 0;
+}
+.nn-editor .bn-file-loading-preview::after {
+  content: 'Envoi en cours…';
+  font-size: 0.875rem;
 }

@@ -23,6 +23,8 @@ import { BlockSideMenu, SelectionToolbar } from './BlockMenus'
 import { BLOCK_CHOICES, filterChoices } from './blockChoices'
 import { toEditorContent } from './content'
 import { createMarkdownFallback } from './markdownFallback'
+import { mediaItems } from './media/mediaItems'
+import { isWebUrl } from './media/urls'
 import type { NonotionBlock, NonotionEditor, NonotionPartialBlock } from './schema'
 import { SIDE_MENU_FLOATING } from './sideMenuPosition'
 import { BLOCK_TYPES, schema } from './schema'
@@ -45,6 +47,29 @@ const dictionary = {
     ...fr.formatting_toolbar,
     underline: { ...fr.formatting_toolbar.underline, tooltip: 'Souligné' },
     colors: { ...fr.formatting_toolbar.colors, tooltip: 'Couleur' },
+  },
+  // « Télécharger » veut dire recevoir : ici, on envoie un fichier de l'appareil, ou on colle un lien.
+  file_panel: {
+    upload: {
+      title: 'Depuis l’appareil',
+      file_placeholder: {
+        image: 'Choisir une image',
+        video: 'Choisir une vidéo',
+        audio: 'Choisir un fichier audio',
+        file: 'Choisir un fichier',
+      },
+      upload_error: 'Le fichier n’a pas pu être envoyé.',
+    },
+    embed: {
+      title: 'Lien',
+      embed_button: {
+        image: 'Insérer l’image',
+        video: 'Insérer la vidéo',
+        audio: 'Insérer l’audio',
+        file: 'Insérer le fichier',
+      },
+      url_placeholder: 'Collez le lien (https://…)',
+    },
   },
 }
 
@@ -203,10 +228,11 @@ function slashMenuItems(
       insertOrUpdateBlockForSlashMenu(editor, choice.block as NonotionPartialBlock)
     },
   }))
-  // Groupes dans l'ordre de la spec 6.3a : Basique, (Médias,) Bases de données, Avancé.
+  // Groupes dans l'ordre de la spec 6.3a : Basique, Média, Bases de données, Avancé.
   return [
     ...blocks.filter((item) => item.group === 'Basique'),
     ...(pages ? pageItems(editor, pages) : []),
+    ...mediaItems(editor),
     ...(databases ? databaseItems(editor, databases) : []),
     ...blocks.filter((item) => item.group !== 'Basique'),
     {
@@ -261,6 +287,7 @@ export default function BlockEditor({
   onExitTop,
   databases,
   pages,
+  uploadFile,
 }: {
   ref?: React.Ref<BlockEditorHandle>
   /** Le document enregistré ; il n'est lu qu'à la création de l'éditeur. */
@@ -270,6 +297,8 @@ export default function BlockEditor({
   onExitTop: () => void
   databases?: DatabaseActions
   pages?: PageActions
+  /** Envoie un fichier de la page et renvoie son adresse (absent : fichiers par lien seulement). */
+  uploadFile?: (file: File) => Promise<string>
 }) {
   const exitTop = useRef(onExitTop)
   useEffect(() => {
@@ -281,6 +310,10 @@ export default function BlockEditor({
     dictionary,
     placeholders,
     initialContent: toEditorContent(content, BLOCK_TYPES) as NonotionPartialBlock[] | undefined,
+    uploadFile,
+    // Une image, une vidéo ou un fichier ne s'affiche ou ne s'ouvre que depuis le web : jamais un
+    // « javascript: » collé comme lien. (blob: : l'aperçu pendant l'envoi.)
+    resolveFileUrl: async (url) => (isWebUrl(url) || url.startsWith('blob:') ? url : ''),
     // La ligne qui montre où le bloc glissé va tomber (P4), dans la couleur d'accent.
     dropCursor: { color: 'var(--accent)', width: 3 },
     extensions: [

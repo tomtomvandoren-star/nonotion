@@ -29,6 +29,7 @@
         "connect-src": "'self' ipc: http://ipc.localhost https://nonotion.thomasvandoren.be",
         "img-src": "'self' data: blob: https:",
         "media-src": "'self' blob: https:",
+        "frame-src": "https://www.youtube-nocookie.com https://player.vimeo.com",
         "style-src": "'self' 'unsafe-inline'",
         "font-src": "'self' data:"
       },
