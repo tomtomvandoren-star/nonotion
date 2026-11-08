@@ -22,7 +22,10 @@ xcrun simctl launch "$UDID" "$BUNDLE"
 sleep 20
 xcrun simctl io "$UDID" screenshot "$OUT/ios.png"
 
-if ! xcrun simctl spawn "$UDID" launchctl list | grep -q "$BUNDLE"; then
+# La liste d'abord, puis la recherche : « grep -q » arrêterait de lire, et launchctl, coupé
+# (SIGPIPE), ferait échouer le tube (pipefail) alors que l'application tourne.
+services="$(xcrun simctl spawn "$UDID" launchctl list)"
+if ! grep -q "$BUNDLE" <<<"$services"; then
   echo "Nonotion s'est arrêté au démarrage." >&2
   exit 1
 fi
