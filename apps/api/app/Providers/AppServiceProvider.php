@@ -3,12 +3,15 @@
 namespace App\Providers;
 
 use App\Models\User;
+use App\Support\PhpMailTransport;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use Symfony\Component\Mailer\Transport\SendmailTransport;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -25,6 +28,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // MAIL_MAILER=sendmail : la commande sendmail, ou la fonction mail() de PHP quand le site ne
+        // peut pas lancer de commande (proc_open désactivé, comme sur l'hébergement mutualisé).
+        Mail::extend('sendmail', fn (array $config) => function_exists('proc_open')
+            ? new SendmailTransport($config['path'] ?? null)
+            : new PhpMailTransport);
+
         // Créations de compte : 10 par minute et par adresse IP, sauf en local et dans les tests,
         // où les tests de bout en bout créent un compte par scénario.
         RateLimiter::for('register', fn (Request $request) => app()->environment('local', 'testing')
