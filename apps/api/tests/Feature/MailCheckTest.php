@@ -30,3 +30,20 @@ it('identifiants refusés : le message dit quoi mettre dans MAIL_USERNAME et MAI
         ->and($explained)->toContain('535 5.7.0 Invalid login or password');
     expect(MailCheck::explain('Connection to "ssl://mail.example.test:465" timed out.'))->toStartWith('serveur injoignable');
 });
+
+it('repère un mot de passe mal écrit dans .env, sans jamais le montrer', function () {
+    expect(MailCheck::passwordFormat(''))->toBe(['MAIL_PASSWORD est vide'])
+        ->and(MailCheck::passwordFormat(' abc '))->toBe(['MAIL_PASSWORD commence ou finit par un espace'])
+        ->and(MailCheck::passwordFormat('"abc"'))->toBe(['MAIL_PASSWORD garde ses guillemets dans la valeur lue'])
+        ->and(MailCheck::passwordFormat('Ab1', 'MAIL_PASSWORD=Ab1 #x9'))
+        ->toBe(['un « # » après un espace coupe MAIL_PASSWORD : l’entourer de guillemets simples'])
+        ->and(MailCheck::passwordFormat('Ab', 'MAIL_PASSWORD="Ab${X}"'))
+        ->toBe(['MAIL_PASSWORD contient « ${ », remplacé à la lecture : l’entourer de guillemets simples'])
+        ->and(MailCheck::passwordFormat('Ab#1$x', "MAIL_PASSWORD='Ab#1\$x'"))->toBe([])
+        ->and(MailCheck::passwordFormat('Ab#1', 'MAIL_PASSWORD=Ab#1'))->toBe([]);
+
+    $env = tempnam(sys_get_temp_dir(), 'env');
+    file_put_contents($env, "APP_NAME=Nonotion\r\nMAIL_PASSWORD='secret'\r\nMAIL_FROM_ADDRESS=a@b.c\r\n");
+    expect(MailCheck::passwordLine($env))->toBe("MAIL_PASSWORD='secret'");
+    unlink($env);
+});

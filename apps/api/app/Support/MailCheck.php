@@ -31,6 +31,52 @@ class MailCheck
         }
     }
 
+    /**
+     * Ce qui cloche dans la façon dont MAIL_PASSWORD est écrit dans .env, sans jamais le montrer :
+     * vide, espaces autour, guillemets gardés, « # » ou « ${ » qui changent la valeur lue.
+     *
+     * @param  string|null  $line  la ligne « MAIL_PASSWORD=… » du fichier .env, telle qu'écrite
+     * @return list<string>
+     */
+    public static function passwordFormat(?string $password, ?string $line = null): array
+    {
+        $problems = [];
+        if ($password === null || $password === '') {
+            $problems[] = 'MAIL_PASSWORD est vide';
+        } elseif ($password !== trim($password)) {
+            $problems[] = 'MAIL_PASSWORD commence ou finit par un espace';
+        } elseif (preg_match('/^([\'"]).*\1$/s', $password)) {
+            $problems[] = 'MAIL_PASSWORD garde ses guillemets dans la valeur lue';
+        }
+
+        $raw = $line === null ? null : trim((string) preg_replace('/^\s*(export\s+)?MAIL_PASSWORD\s*=/', '', $line));
+        if ($raw !== null && $raw !== '') {
+            $quote = $raw[0];
+            if ($quote !== '"' && $quote !== "'" && preg_match('/\s#/', $raw)) {
+                $problems[] = 'un « # » après un espace coupe MAIL_PASSWORD : l’entourer de guillemets simples';
+            } elseif ($quote !== "'" && str_contains($raw, '${')) {
+                $problems[] = 'MAIL_PASSWORD contient « ${ », remplacé à la lecture : l’entourer de guillemets simples';
+            } elseif ($quote !== '"' && $quote !== "'" && preg_match('/\s/', $raw)) {
+                $problems[] = 'MAIL_PASSWORD contient un espace : l’entourer de guillemets simples';
+            }
+        }
+
+        return $problems;
+    }
+
+    /** La ligne MAIL_PASSWORD du fichier .env (pour passwordFormat), ou null. */
+    public static function passwordLine(string $envFile): ?string
+    {
+        $lines = is_readable($envFile) ? (file($envFile, FILE_IGNORE_NEW_LINES) ?: []) : [];
+        foreach ($lines as $line) {
+            if (preg_match('/^\s*(export\s+)?MAIL_PASSWORD\s*=/', $line)) {
+                return rtrim($line, "\r");
+            }
+        }
+
+        return null;
+    }
+
     /** Le message du serveur, précédé de ce qu'il veut dire et de quoi changer dans .env. */
     public static function explain(string $message): string
     {

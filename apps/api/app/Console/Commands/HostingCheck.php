@@ -164,6 +164,16 @@ class HostingCheck extends Command
         $server = config('mail.mailers.smtp.host').':'.config('mail.mailers.smtp.port');
         $problem = MailCheck::smtp();
         $this->report("Serveur d’e-mails ({$server})", $problem ?? 'connexion et identifiants acceptés', $problem === null);
+        if ($problem === null) {
+            return;
+        }
+
+        // Identifiants refusés : peut-être la façon dont le mot de passe est écrit (jamais affiché).
+        $format = MailCheck::passwordFormat(config('mail.mailers.smtp.password'), MailCheck::passwordLine(base_path('.env')));
+        $this->report('Écriture de MAIL_PASSWORD dans .env', $format === [] ? 'rien d’anormal (vérifier le mot de passe lui-même)' : implode(' ; ', $format), $format === []);
+        // Sans mot de passe : l'envoi par le serveur lui-même (MAIL_MAILER=sendmail), s'il le permet.
+        $sendmail = is_executable('/usr/sbin/sendmail');
+        $this->report('Envoi sans mot de passe (sendmail du serveur)', $sendmail ? 'disponible : MAIL_MAILER=sendmail' : 'indisponible');
     }
 
     private function checkOutboundHttps(): void
