@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Déploiement de Nonotion sur l'hébergement mutualisé Infomaniak (spec 1.8).
 #
-# Usage : ./deploy.sh [--check]
+# Usage : ./deploy.sh [--check] [--mail-test]
 # Les réglages viennent de deploy.env (non versionné, voir deploy.env.example) ou de l'environnement :
 #   DEPLOY_HOST, DEPLOY_USER : accès SSH
 #   DEPLOY_PATH : dossier du code Laravel sur le serveur (relatif au dossier personnel, ou absolu).
@@ -10,6 +10,7 @@
 # Facultatif : DEPLOY_PORT (22), DEPLOY_SSH_KEY (~/.ssh/nonotion_deploy), REMOTE_PHP (php), REMOTE_COMPOSER (composer),
 #              DB_HOST, DB_DATABASE, DB_USERNAME (pré-remplis dans le .env du premier déploiement ; jamais le mot de passe).
 # --check : lance aussi « php artisan nonotion:hosting-check » sur le serveur (phase 0).
+# --mail-test : la vérification envoie en plus un e-mail de test à MAIL_FROM_ADDRESS (implique --check).
 #
 # L'accès SSH se fait par clé : le script ne demande ni ne stocke aucun mot de passe.
 set -euo pipefail
@@ -28,7 +29,14 @@ DEPLOY_SSH_KEY="${DEPLOY_SSH_KEY:-$HOME/.ssh/nonotion_deploy}"
 REMOTE_PHP="${REMOTE_PHP:-php}"
 REMOTE_COMPOSER="${REMOTE_COMPOSER:-composer}"
 RUN_CHECK=false
-[[ "${1:-}" == "--check" ]] && RUN_CHECK=true
+CHECK_ARGS=""
+for arg in "$@"; do
+  case "$arg" in
+    --check) RUN_CHECK=true ;;
+    --mail-test) RUN_CHECK=true; CHECK_ARGS="--mail-test" ;;
+    *) echo "Option inconnue : $arg" >&2; exit 1 ;;
+  esac
+done
 
 API="$ROOT/apps/api"
 DIST="$ROOT/apps/web/dist"
@@ -107,7 +115,7 @@ $REMOTE_PHP artisan migrate --force
 $REMOTE_PHP artisan config:cache
 $REMOTE_PHP artisan route:cache
 if $RUN_CHECK; then
-  $REMOTE_PHP artisan nonotion:hosting-check
+  $REMOTE_PHP artisan nonotion:hosting-check $CHECK_ARGS
 fi
 REMOTE
 

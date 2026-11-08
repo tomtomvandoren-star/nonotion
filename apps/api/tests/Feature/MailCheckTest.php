@@ -47,3 +47,21 @@ it('repère un mot de passe mal écrit dans .env, sans jamais le montrer', funct
     expect(MailCheck::passwordLine($env))->toBe("MAIL_PASSWORD='secret'");
     unlink($env);
 });
+
+it('la vérification envoie un e-mail de test et montre le dernier envoi raté du site, adresses masquées', function () {
+    config(['mail.default' => 'array', 'mail.from.address' => 'admin@exemple.test']);
+    MailCheck::rememberFailure(new RuntimeException('Process failed with exit code 1: refused for jean@exemple.be'));
+
+    expect(MailCheck::maskAddresses('refused for jean@exemple.be'))->toBe('refused for …@exemple.be')
+        ->and(MailCheck::explain('Process failed with exit code 1: refused'))->toStartWith('sendmail a refusé l’e-mail');
+
+    $this->artisan('nonotion:hosting-check', ['--skip-network' => true, '--mail-test' => true])
+        ->expectsOutputToContain('Dernier envoi raté par le site')
+        ->doesntExpectOutputToContain('jean@exemple.be')
+        ->expectsOutputToContain('E-mail de test à …@exemple.test')
+        ->assertSuccessful();
+
+    $sent = app('mailer')->getSymfonyTransport()->messages();
+    expect($sent)->toHaveCount(1)
+        ->and($sent->first()->getOriginalMessage()->getSubject())->toBe('Nonotion : e-mail de test');
+});

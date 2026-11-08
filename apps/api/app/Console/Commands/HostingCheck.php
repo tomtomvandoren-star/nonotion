@@ -7,6 +7,7 @@ use App\Support\MailCheck;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -15,7 +16,7 @@ use Throwable;
  * PHP, extensions, limites, MariaDB, droits d'écriture, cron, connexions HTTPS sortantes et SMTP.
  * À lancer en SSH sur le serveur : php artisan nonotion:hosting-check
  */
-#[Signature('nonotion:hosting-check {--skip-network : Ne pas tester les connexions sortantes}')]
+#[Signature('nonotion:hosting-check {--skip-network : Ne pas tester les connexions sortantes} {--mail-test : Envoyer un e-mail de test à MAIL_FROM_ADDRESS}')]
 #[Description("Vérifie que l'hébergement a tout ce qu'il faut pour Nonotion")]
 class HostingCheck extends Command
 {
@@ -146,7 +147,26 @@ class HostingCheck extends Command
         $this->report('E-mails (réinitialisation du mot de passe)', $smtpReady
             ? "envoi par {$mailer}"
             : 'SMTP incomplet : remplir MAIL_USERNAME, MAIL_PASSWORD et MAIL_FROM_ADDRESS');
+        if ($mailer === 'sendmail') {
+            $this->report('Commande sendmail', (string) config('mail.mailers.sendmail.path'));
+            $this->report('sendmail_path de PHP', (string) ini_get('sendmail_path') ?: 'aucun');
+            $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+            $procOpen = function_exists('proc_open') && ! in_array('proc_open', $disabled, true);
+            $this->report('proc_open (lancer sendmail)', $procOpen ? 'disponible' : 'désactivée', $procOpen);
+        }
+        // Le dernier envoi raté par le site lui-même (son PHP n'est pas celui de cette console).
+        $failure = MailCheck::lastFailure();
+        if ($failure !== null) {
+            $this->report('Dernier envoi raté par le site', Carbon::parse($failure['at'])->diffForHumans()
+                .' : '.MailCheck::maskAddresses(MailCheck::explain($failure['message'])));
+        }
         $from = config('mail.from.address');
+        if ($this->option('mail-test') && $from) {
+            $problem = MailCheck::send((string) $from);
+            $this->report('E-mail de test à '.MailCheck::maskAddresses((string) $from), $problem === null
+                ? 'parti (vérifier qu’il arrive, spams compris)'
+                : MailCheck::maskAddresses($problem), $problem === null);
+        }
         if ($mailer === 'smtp' && $from) {
             $valid = filter_var($from, FILTER_VALIDATE_EMAIL) !== false;
             $this->report('Adresse d’expédition (MAIL_FROM_ADDRESS)', $valid

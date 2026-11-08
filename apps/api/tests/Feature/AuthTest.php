@@ -2,6 +2,7 @@
 
 use App\Models\Page;
 use App\Models\User;
+use App\Support\MailCheck;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
@@ -111,6 +112,9 @@ it('répond 503 avec un message clair si l’envoi d’e-mails ne marche pas', f
     $this->postJson('/api/auth/forgot-password', ['email' => $user->email])
         ->assertStatus(503)
         ->assertJsonPath('message', 'L’envoi d’e-mails est indisponible pour le moment. Réessayez plus tard.');
+
+    // L'erreur est retenue pour la vérification de l'hébergement.
+    expect(MailCheck::lastFailure()['message'] ?? null)->toBe('SMTP injoignable');
 });
 
 it('réinitialise le mot de passe et déconnecte tous les appareils', function () {

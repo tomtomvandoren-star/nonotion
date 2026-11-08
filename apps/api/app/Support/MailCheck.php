@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
 use Symfony\Component\Mailer\Transport\Smtp\EsmtpTransport;
 use Throwable;
@@ -13,6 +14,47 @@ use Throwable;
  */
 class MailCheck
 {
+    /** Le dernier envoi raté par le site (pas par la console), pour la vérification de l'hébergement. */
+    private const LAST_FAILURE = 'mail:last_failure';
+
+    /** Retient l'erreur d'un envoi raté par le site : la vérification de l'hébergement la montrera. */
+    public static function rememberFailure(Throwable $e): void
+    {
+        Cache::put(self::LAST_FAILURE, [
+            'at' => now()->toIso8601String(),
+            'message' => mb_substr($e->getMessage(), 0, 500),
+        ], now()->addDays(7));
+    }
+
+    /** @return array{at: string, message: string}|null */
+    public static function lastFailure(): ?array
+    {
+        $failure = Cache::get(self::LAST_FAILURE);
+
+        return is_array($failure) ? $failure : null;
+    }
+
+    /** Envoie un e-mail de test : null s'il est parti, sinon ce qui ne va pas. */
+    public static function send(string $to): ?string
+    {
+        try {
+            Mail::raw(
+                'Ceci est un e-mail de test de Nonotion, envoyé par la vérification de l’hébergement. Il peut être supprimé.',
+                fn ($message) => $message->to($to)->subject('Nonotion : e-mail de test'),
+            );
+
+            return null;
+        } catch (Throwable $e) {
+            return self::explain($e->getMessage());
+        }
+    }
+
+    /** « jean@exemple.be » devient « …@exemple.be » : la vérification n'affiche aucune adresse. */
+    public static function maskAddresses(string $text): string
+    {
+        return (string) preg_replace('/[^\s<>"\'(),;:]+@([A-Za-z0-9.-]+\.[A-Za-z]{2,})/', '…@$1', $text);
+    }
+
     /** null si le serveur accepte la connexion et les identifiants ; sinon, ce qui ne va pas. */
     public static function smtp(int $timeout = 10): ?string
     {
@@ -82,6 +124,7 @@ class MailCheck
     {
         $message = mb_substr(trim((string) preg_replace('/\s+/', ' ', $message)), 0, 300);
         $hint = match (true) {
+            stripos($message, 'exit code') !== false || stripos($message, 'process') !== false => 'sendmail a refusé l’e-mail : la réponse de la commande suit',
             str_contains($message, '535') || stripos($message, 'authenticat') !== false => 'identifiants refusés : MAIL_USERNAME doit être l’adresse complète de la boîte, MAIL_PASSWORD son mot de passe (ou un mot de passe d’application si la double authentification est active)',
             stripos($message, 'could not be established') !== false || stripos($message, 'timed out') !== false || stripos($message, 'timeout') !== false => 'serveur injoignable : vérifier MAIL_HOST et MAIL_PORT (465 avec MAIL_SCHEME=smtps, ou 587 avec MAIL_SCHEME=smtp)',
             stripos($message, 'ssl') !== false || stripos($message, 'tls') !== false || stripos($message, 'certificate') !== false => 'chiffrement refusé : 465 va avec MAIL_SCHEME=smtps, 587 avec MAIL_SCHEME=smtp',

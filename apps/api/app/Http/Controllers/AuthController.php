@@ -7,6 +7,7 @@ use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Requests\Auth\ResetPasswordRequest;
 use App\Models\User;
+use App\Support\MailCheck;
 use App\Support\Onboarding;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
@@ -97,6 +98,7 @@ class AuthController extends Controller
                 Password::broker()->deleteToken($user);
             }
             Log::error('Envoi de l’e-mail de réinitialisation impossible', ['exception' => $e::class, 'message' => $e->getMessage()]);
+            MailCheck::rememberFailure($e);
 
             return response()->json(['message' => __('auth.mail_unavailable')], 503);
         }
