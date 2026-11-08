@@ -275,3 +275,7 @@ Une ligne par décision : la décision, puis sa raison (spec, section 0, règle 
 - **Un serveur SMTP muet fait échouer l'envoi en 10 s (`MAIL_TIMEOUT`), au lieu d'une minute** : la page ne reste plus bloquée, et le message s'affiche.
 - **Le serveur SMTP d'Infomaniak refuse les identifiants de `admin@thomasvandoren.be`, même avec un mot de passe d'application ; l'écriture du mot de passe dans `.env` est correcte.** L'hébergement peut envoyer lui-même (sendmail) : `MAIL_MAILER=sendmail` dans `.env` suffit, sans mot de passe. La commande par défaut devient `/usr/sbin/sendmail -t -i`, comprise par tous les sendmail.
 - **Le PHP du site ne peut pas lancer sendmail (`proc_open` désactivé chez Infomaniak), celui de la console oui.** L'e-mail de test de la vérification partait, mais pas ceux du site. Avec `MAIL_MAILER=sendmail`, le site passe donc par la fonction `mail()` de PHP quand `proc_open` manque : l'hébergeur la règle lui-même. La vérification montre l'erreur du dernier envoi raté par le site (gardée 7 jours, adresses masquées), et `./deploy.sh --mail-test` envoie un e-mail de test à `MAIL_FROM_ADDRESS`.
+
+## Version 0.11.0 des applications
+
+- **Une seule version pour toutes les applications : 0.11.0** (ordinateur, Android, iOS), avec les blocs Média et la création de compte. L'application pour ordinateur passe de 0.8.0 à 0.11.0 ; Android et iOS de 0.10.0 à 0.11.0. Un même numéro veut dire les mêmes fonctions partout. Android compte ses versions en `versionCode` : 1100 pour 0.11.0.

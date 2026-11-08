@@ -1,6 +1,6 @@
 [package]
 name = "nonotion"
-version = "0.8.0"
+version = "0.11.0"
 description = "Nonotion pour Windows, macOS et Linux"
 edition = "2021"
 rust-version = "1.88"
