@@ -288,6 +288,7 @@ export default function BlockEditor({
   databases,
   pages,
   uploadFile,
+  readOnly = false,
 }: {
   ref?: React.Ref<BlockEditorHandle>
   /** Le document enregistré ; il n'est lu qu'à la création de l'éditeur. */
@@ -299,6 +300,8 @@ export default function BlockEditor({
   pages?: PageActions
   /** Envoie un fichier de la page et renvoie son adresse (absent : fichiers par lien seulement). */
   uploadFile?: (file: File) => Promise<string>
+  /** Lecture seule : une version montrée côte à côte avec une autre (« Gestion de conflit »). */
+  readOnly?: boolean
 }) {
   const exitTop = useRef(onExitTop)
   useEffect(() => {
@@ -365,6 +368,7 @@ export default function BlockEditor({
     <BlockNoteView
       editor={editor}
       theme={theme}
+      editable={!readOnly}
       onChange={onChange}
       slashMenu={false}
       sideMenu={false}

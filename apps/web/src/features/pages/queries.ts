@@ -1,6 +1,12 @@
-import type { PageDetail, PageTreeItem } from '@nonotion/shared'
+import {
+  comparePositions,
+  positionBetween,
+  type PageDetail,
+  type PageTreeItem,
+} from '@nonotion/shared'
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { newId } from '@/lib/offline/ulid'
 import { fetchProfile } from '@/lib/api/auth'
 import {
   createPage,
@@ -67,6 +73,62 @@ export function useTrash(enabled: boolean) {
 
 type TreeUpdater = (pages: PageTreeItem[]) => PageTreeItem[]
 
+/** La page telle que l'arbre la connaît (ou, à défaut, l'aperçu ouvert) : pour un résultat hors ligne. */
+function knownTreeItem(
+  queryClient: QueryClient,
+  workspaceId: string,
+  pageId: string,
+): PageTreeItem {
+  const fromTree = queryClient
+    .getQueryData<PageTreeItem[]>(queryKeys.tree(workspaceId))
+    ?.find((page) => page.id === pageId)
+  const page = fromTree ?? queryClient.getQueryData<PageDetail>(queryKeys.page(pageId))
+  return {
+    id: pageId,
+    parent_page_id: page?.parent_page_id ?? null,
+    title: page?.title ?? '',
+    icon: page?.icon ?? null,
+    is_favorite: page?.is_favorite ?? false,
+    position: page?.position ?? 'a0',
+    updated_at: new Date().toISOString(),
+  }
+}
+
+/** La place après la dernière sœur : une page créée va en fin de liste (comme sur le serveur). */
+function endPosition(queryClient: QueryClient, workspaceId: string, parentId: string | null) {
+  const siblings = (queryClient.getQueryData<PageTreeItem[]>(queryKeys.tree(workspaceId)) ?? [])
+    .filter((page) => page.parent_page_id === parentId)
+    .map((page) => page.position)
+    .sort(comparePositions)
+  return positionBetween(siblings.at(-1) ?? null, null)
+}
+
+/** Une page neuve, telle que le serveur la renverrait : l'écran l'affiche avant même sa réponse. */
+function localPage(
+  workspaceId: string,
+  input: { id: string; title?: string; parent_page_id?: string | null; position: string },
+): PageDetail {
+  const now = new Date().toISOString()
+  return {
+    id: input.id,
+    workspace_id: workspaceId,
+    parent_page_id: input.parent_page_id ?? null,
+    database_id: null,
+    properties: null,
+    calendar_source_id: null,
+    sync_conflict: null,
+    title: input.title ?? '',
+    icon: null,
+    cover_url: null,
+    is_favorite: false,
+    position: input.position,
+    content: null,
+    version: 1,
+    created_at: now,
+    updated_at: now,
+  }
+}
+
 /** Modifie l'arbre en cache (mise à jour optimiste) et renvoie l'état précédent pour l'annuler. */
 function patchTreeCache(queryClient: QueryClient, workspaceId: string, update: TreeUpdater) {
   const key = queryKeys.tree(workspaceId)
@@ -104,7 +166,12 @@ export function useUpdatePage() {
   return useMutation({
     mutationKey: SAVE_MUTATION_KEY,
     mutationFn: ({ pageId, patch }: { pageId: string; patch: PagePatch }) =>
-      updatePage(pageId, patch),
+      updatePage(pageId, patch, {
+        label: 'le titre, l’icône ou la couverture d’une page',
+        key: `page:${pageId}`,
+        merge: 'patch',
+        result: () => ({ ...knownTreeItem(queryClient, workspaceId, pageId), ...patch }),
+      }),
     onMutate: ({ pageId, patch }) => ({
       undo: applyPagePatchLocally(queryClient, workspaceId, pageId, patch),
     }),
@@ -124,8 +191,19 @@ export function useCreatePage() {
   const workspaceId = useWorkspaceId() ?? ''
   return useMutation({
     mutationKey: SAVE_MUTATION_KEY,
-    mutationFn: (input: { parent_page_id?: string | null; position?: string; title?: string }) =>
-      createPage(workspaceId, input),
+    // L'identifiant est choisi ici : hors ligne, la page existe déjà à l'écran (spec 6.16).
+    mutationFn: (input: { parent_page_id?: string | null; position?: string; title?: string }) => {
+      const full = {
+        ...input,
+        id: newId(),
+        position:
+          input.position ?? endPosition(queryClient, workspaceId, input.parent_page_id ?? null),
+      }
+      return createPage(workspaceId, full, {
+        label: 'une page créée',
+        result: () => localPage(workspaceId, full),
+      })
+    },
     onSuccess: (page) => {
       patchTreeCache(queryClient, workspaceId, (pages) => [...pages, page])
       queryClient.setQueryData(queryKeys.page(page.id), page)
@@ -139,7 +217,16 @@ export function useMovePage() {
   const workspaceId = useWorkspaceId() ?? ''
   return useMutation({
     mutationKey: SAVE_MUTATION_KEY,
-    mutationFn: ({ pageId, parentId, position }: MoveInput) => movePage(pageId, parentId, position),
+    mutationFn: ({ pageId, parentId, position }: MoveInput) =>
+      movePage(pageId, parentId, position, {
+        label: 'une page déplacée',
+        key: `move:${pageId}`,
+        result: () => ({
+          ...knownTreeItem(queryClient, workspaceId, pageId),
+          parent_page_id: parentId,
+          position,
+        }),
+      }),
     onMutate: ({ pageId, parentId, position }) => ({
       undo: patchTreeCache(queryClient, workspaceId, (pages) =>
         pages.map((page) =>
@@ -177,8 +264,26 @@ export function useRestorePage() {
   const workspaceId = useWorkspaceId() ?? ''
   return useMutation({
     mutationKey: SAVE_MUTATION_KEY,
-    mutationFn: restorePage,
-    onSuccess: () => {
+    mutationFn: (pageId: string) =>
+      restorePage(pageId, {
+        label: 'une page restaurée',
+        result: () => {
+          const trashed = queryClient
+            .getQueryData<{ id: string; title: string; icon: string | null }[]>(
+              queryKeys.trash(workspaceId),
+            )
+            ?.find((page) => page.id === pageId)
+          return {
+            ...knownTreeItem(queryClient, workspaceId, pageId),
+            ...(trashed ? { title: trashed.title, icon: trashed.icon } : {}),
+          }
+        },
+      }),
+    onSuccess: (page) => {
+      // Hors ligne, l'arbre ne se recharge pas : la page y revient tout de suite.
+      patchTreeCache(queryClient, workspaceId, (pages) =>
+        pages.some((item) => item.id === page.id) ? pages : [...pages, page],
+      )
       void queryClient.invalidateQueries({ queryKey: queryKeys.tree(workspaceId) })
       void queryClient.invalidateQueries({ queryKey: queryKeys.trash(workspaceId) })
     },
@@ -193,7 +298,11 @@ export function useTrashPage() {
   const restore = useRestorePage()
   return useMutation({
     mutationKey: SAVE_MUTATION_KEY,
-    mutationFn: trashPage,
+    mutationFn: (pageId: string) =>
+      trashPage(pageId, {
+        label: 'une page mise à la corbeille',
+        result: () => ({ status: 'ok' as const }),
+      }),
     onMutate: (pageId) => ({
       undo: patchTreeCache(queryClient, workspaceId, (pages) => {
         const removed = new Set([pageId])

@@ -1,6 +1,6 @@
-import { agendaSchema, type AgendaSettings } from '@nonotion/shared'
+import { agendaSchema, type Agenda, type AgendaSettings } from '@nonotion/shared'
 import { z } from 'zod'
-import { apiGet, apiRequest } from './client'
+import { apiGet, apiRequest, inData, type OfflineWrite } from './client'
 
 const dataOf = <T extends z.ZodType>(schema: T) => z.object({ data: schema })
 
@@ -8,7 +8,11 @@ const dataOf = <T extends z.ZodType>(schema: T) => z.object({ data: schema })
 export const fetchAgenda = (workspaceId: string) =>
   apiGet(`workspaces/${workspaceId}/agenda`, dataOf(agendaSchema)).then((r) => r.data)
 
-export const updateAgenda = (workspaceId: string, patch: Partial<AgendaSettings>) =>
-  apiRequest('PATCH', `workspaces/${workspaceId}/agenda`, dataOf(agendaSchema), patch).then(
-    (r) => r.data,
-  )
+export const updateAgenda = (
+  workspaceId: string,
+  patch: Partial<AgendaSettings>,
+  offline?: OfflineWrite<Agenda>,
+) =>
+  apiRequest('PATCH', `workspaces/${workspaceId}/agenda`, dataOf(agendaSchema), patch, {
+    offline: inData(offline),
+  }).then((r) => r.data)

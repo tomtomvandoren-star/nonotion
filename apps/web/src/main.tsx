@@ -3,7 +3,9 @@ import { RouterProvider } from '@tanstack/react-router'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { ApiError, setUnauthorizedHandler } from '@/lib/api/client'
+import { restoreOffline, startOffline } from '@/lib/offline/setup'
 import { endSession, restoreSession } from '@/lib/session'
+import { platform } from '@/platform'
 import { router } from './router'
 import './index.css'
 
@@ -15,6 +17,8 @@ const queryClient = new QueryClient({
         !(error instanceof ApiError && error.status < 500) && failureCount < 2,
       refetchOnWindowFocus: true,
     },
+    // Une écriture part toujours : hors ligne, c'est la file d'attente qui la garde (spec 6.16).
+    mutations: { networkMode: 'always' },
   },
 })
 
@@ -29,7 +33,9 @@ setUnauthorizedHandler(() => {
 const root = document.getElementById('root')
 if (!root) throw new Error('Élément #root introuvable dans index.html')
 
-void restoreSession().then(() => {
+// Applications natives : la copie locale et la file d'attente sont relues avant le premier affichage.
+void Promise.all([restoreSession(), platform.offline && restoreOffline(queryClient)]).then(() => {
+  if (platform.offline) startOffline(queryClient)
   createRoot(root).render(
     <StrictMode>
       <QueryClientProvider client={queryClient}>

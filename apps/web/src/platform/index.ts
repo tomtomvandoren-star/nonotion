@@ -27,6 +27,11 @@ export interface Reminder {
 export interface Platform {
   /** Le site dans un navigateur, l'application pour ordinateur (Tauri) ou mobile (Capacitor). */
   kind: 'web' | 'desktop' | 'mobile'
+  /**
+   * Garde une copie locale et une file d'attente pour travailler hors ligne (spec 6.16) : les
+   * applications natives. Le site web, non (1.6.10).
+   */
+  offline: boolean
   /** Cmd sur macOS, Ctrl ailleurs (spec 1.6.6). */
   isMac: boolean
   /** Écran tactile principal : les contrôles « au survol » restent visibles. */

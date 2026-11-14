@@ -70,6 +70,8 @@ const secureStorage: Platform['secureStorage'] = {
 export const tauriPlatform: Platform = {
   ...webPlatform,
   kind: 'desktop',
+  // Hors ligne : copie locale et file d'attente (spec 6.16).
+  offline: true,
   secureStorage,
   openExternal,
   // Pas de feuille de partage sur ordinateur : « Copier le lien ».

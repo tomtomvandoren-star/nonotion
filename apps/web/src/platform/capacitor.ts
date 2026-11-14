@@ -127,6 +127,8 @@ async function syncReminders(reminders: readonly Reminder[]): Promise<void> {
 export const capacitorPlatform: Platform = {
   ...webPlatform,
   kind: 'mobile',
+  // Hors ligne : copie locale et file d'attente (spec 6.16).
+  offline: true,
   // Un téléphone ou une tablette : les contrôles « au survol » restent visibles (spec 1.6.4).
   isTouch: true,
   secureStorage,

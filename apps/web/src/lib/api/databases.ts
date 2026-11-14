@@ -3,12 +3,15 @@ import {
   databaseRowSchema,
   databaseViewSchema,
   pageDetailSchema,
+  type DatabaseDetail,
+  type DatabaseRowData,
+  type DatabaseView,
   type Property,
   type ViewConfig,
   type ViewType,
 } from '@nonotion/shared'
 import { z } from 'zod'
-import { apiGet, apiRequest } from './client'
+import { apiGet, apiRequest, inData, type OfflineWrite } from './client'
 
 const dataOf = <T extends z.ZodType>(schema: T) => z.object({ data: schema })
 
@@ -41,16 +44,21 @@ export const createFeed = (databaseId: string) =>
 export const deleteFeed = (databaseId: string) =>
   apiRequest('DELETE', `databases/${databaseId}/feed`, z.unknown())
 
-export const renameDatabase = (databaseId: string, title: string) =>
-  apiRequest('PATCH', `databases/${databaseId}`, z.unknown(), { title })
+export const renameDatabase = (
+  databaseId: string,
+  title: string,
+  offline?: OfflineWrite<unknown>,
+) => apiRequest('PATCH', `databases/${databaseId}`, z.unknown(), { title }, { offline })
 
+/** `id` : choisi sur l'appareil, pour une ligne créée hors ligne (spec 6.16). */
 export const createRow = (
   databaseId: string,
-  input: { title?: string; properties?: Record<string, unknown>; position?: string },
+  input: { id?: string; title?: string; properties?: Record<string, unknown>; position?: string },
+  offline?: OfflineWrite<DatabaseRowData>,
 ) =>
-  apiRequest('POST', `databases/${databaseId}/rows`, dataOf(databaseRowSchema), input).then(
-    (r) => r.data,
-  )
+  apiRequest('POST', `databases/${databaseId}/rows`, dataOf(databaseRowSchema), input, {
+    offline: inData(offline),
+  }).then((r) => r.data)
 
 /** Ce qui change d'une ligne : son titre, des valeurs, ou sa place (glisser une carte). */
 export type RowPatch = { title?: string; properties?: Record<string, unknown>; position?: string }
@@ -59,56 +67,74 @@ export type RowPatch = { title?: string; properties?: Record<string, unknown>; p
  * Titre ou valeurs d'une ligne : seules les propriétés envoyées changent. `created` : la prochaine
  * occurrence d'une tâche récurrente qui vient d'être terminée (spec 6.7).
  */
-export const updateRow = (rowId: string, patch: RowPatch, options?: { keepalive?: boolean }) =>
+const rowUpdateSchema = z.object({
+  data: z.object({ id: z.string(), properties: z.record(z.string(), z.unknown()) }),
+  created: databaseRowSchema.optional(),
+})
+
+export const updateRow = (
+  rowId: string,
+  patch: RowPatch,
+  options?: { keepalive?: boolean; offline?: OfflineWrite<z.infer<typeof rowUpdateSchema>> },
+) => apiRequest('PATCH', `pages/${rowId}`, rowUpdateSchema, patch, options)
+
+type DatabaseOffline = OfflineWrite<DatabaseDetail>
+
+export const addProperty = (databaseId: string, property: Property, offline?: DatabaseOffline) =>
   apiRequest(
-    'PATCH',
-    `pages/${rowId}`,
-    z.object({
-      data: z.object({ id: z.string(), properties: z.record(z.string(), z.unknown()) }),
-      created: databaseRowSchema.optional(),
-    }),
-    patch,
-    options,
-  )
+    'POST',
+    `databases/${databaseId}/properties`,
+    dataOf(databaseDetailSchema),
+    { property },
+    { offline: inData(offline) },
+  ).then((r) => r.data)
 
-export const addProperty = (databaseId: string, property: Property) =>
-  apiRequest('POST', `databases/${databaseId}/properties`, dataOf(databaseDetailSchema), {
-    property,
-  }).then((r) => r.data)
-
-export const updateProperty = (databaseId: string, property: Property) =>
+export const updateProperty = (databaseId: string, property: Property, offline?: DatabaseOffline) =>
   apiRequest(
     'PATCH',
     `databases/${databaseId}/properties/${property.id}`,
     dataOf(databaseDetailSchema),
     { property },
+    { offline: inData(offline) },
   ).then((r) => r.data)
 
-export const deleteProperty = (databaseId: string, propertyId: string) =>
+export const deleteProperty = (databaseId: string, propertyId: string, offline?: DatabaseOffline) =>
   apiRequest(
     'DELETE',
     `databases/${databaseId}/properties/${propertyId}`,
     dataOf(databaseDetailSchema),
+    undefined,
+    { offline: inData(offline) },
   ).then((r) => r.data)
 
+/** `id` : choisi sur l'appareil, pour une vue créée hors ligne (spec 6.16). */
 export const createView = (
   databaseId: string,
-  input: { name: string; type: ViewType; config: ViewConfig },
+  input: { id?: string; name: string; type: ViewType; config: ViewConfig },
+  offline?: OfflineWrite<DatabaseView>,
 ) =>
-  apiRequest('POST', `databases/${databaseId}/views`, dataOf(databaseViewSchema), input).then(
-    (r) => r.data,
-  )
+  apiRequest('POST', `databases/${databaseId}/views`, dataOf(databaseViewSchema), input, {
+    offline: inData(offline),
+  }).then((r) => r.data)
 
 export const updateView = (
   viewId: string,
   patch: { name?: string; config?: ViewConfig; position?: string },
-  options?: { keepalive?: boolean },
+  options?: { keepalive?: boolean; offline?: OfflineWrite<DatabaseView> },
 ) =>
-  apiRequest('PATCH', `views/${viewId}`, dataOf(databaseViewSchema), patch, options).then(
-    (r) => r.data,
-  )
+  apiRequest('PATCH', `views/${viewId}`, dataOf(databaseViewSchema), patch, {
+    keepalive: options?.keepalive,
+    offline: inData(options?.offline),
+  }).then((r) => r.data)
 
-export const duplicateView = (viewId: string) =>
-  apiRequest('POST', `views/${viewId}/duplicate`, dataOf(databaseViewSchema)).then((r) => r.data)
+export const duplicateView = (viewId: string, id?: string, offline?: OfflineWrite<DatabaseView>) =>
+  apiRequest(
+    'POST',
+    `views/${viewId}/duplicate`,
+    dataOf(databaseViewSchema),
+    id ? { id } : undefined,
+    { offline: inData(offline) },
+  ).then((r) => r.data)
 
-export const deleteView = (viewId: string) => apiRequest('DELETE', `views/${viewId}`, z.unknown())
+export const deleteView = (viewId: string, offline?: OfflineWrite<unknown>) =>
+  apiRequest('DELETE', `views/${viewId}`, z.unknown(), undefined, { offline })

@@ -25,6 +25,15 @@ import {
   updateRow,
   updateView,
 } from '@/lib/api/databases'
+import { newId } from '@/lib/offline/ulid'
+import {
+  endRowPosition,
+  localRow,
+  localView,
+  localViewCopy,
+  withPropertyChange,
+  type PropertyChange,
+} from './localChanges'
 import { formatDate } from './values'
 
 export const databaseKey = (databaseId: string) => ['database', databaseId] as const
@@ -203,6 +212,12 @@ const mergePatches = (patches: RowPatch[]): RowPatch =>
 function send(rowId: string, waiting: Waiting[]) {
   return updateRow(rowId, mergePatches(waiting.map((item) => item.patch)), {
     keepalive: true,
+    offline: {
+      label: 'les valeurs d’une ligne',
+      key: `row:${rowId}`,
+      merge: 'patch',
+      result: () => ({ data: { id: rowId, properties: {} }, created: undefined }),
+    },
   }).then(
     // Une tâche récurrente créée par cet envoi n'est annoncée qu'une fois.
     (result) =>
@@ -309,6 +324,7 @@ export function useCreateRow(databaseId?: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationKey: SAVE_MUTATION_KEY,
+    // L'identifiant et la place sont choisis ici : hors ligne, la ligne existe déjà (spec 6.16).
     mutationFn: ({
       databaseId: target,
       ...input
@@ -317,7 +333,15 @@ export function useCreateRow(databaseId?: string) {
       properties?: Record<string, unknown>
       position?: string
       databaseId?: string
-    }) => createRow(target ?? databaseId ?? '', input),
+    }) => {
+      const base = target ?? databaseId ?? ''
+      const database = queryClient.getQueryData<DatabaseDetail>(databaseKey(base))
+      const full = { ...input, id: newId(), position: input.position ?? endRowPosition(database) }
+      return createRow(base, full, {
+        label: 'une ligne créée',
+        result: () => localRow(database, full),
+      })
+    },
     onSuccess: (row: DatabaseRowData, { databaseId: target }) => {
       patchDatabase(queryClient, target ?? databaseId ?? '', (database) => ({
         ...database,
@@ -333,17 +357,22 @@ export function usePropertyMutation(databaseId: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationKey: SAVE_MUTATION_KEY,
-    mutationFn: (
-      change:
-        | { kind: 'add'; property: Property }
-        | { kind: 'update'; property: Property }
-        | { kind: 'delete'; propertyId: string },
-    ) =>
-      change.kind === 'add'
-        ? addProperty(databaseId, change.property)
+    mutationFn: (change: PropertyChange) => {
+      const offline = {
+        label: 'une propriété de la base',
+        result: () => {
+          const current = queryClient.getQueryData<DatabaseDetail>(databaseKey(databaseId))
+          if (!current) throw new Error('Base inconnue hors ligne.')
+          // La modification est déjà à l'écran pour « update » (onMutate) : on la refait sans risque.
+          return withPropertyChange(current, change)
+        },
+      }
+      return change.kind === 'add'
+        ? addProperty(databaseId, change.property, offline)
         : change.kind === 'update'
-          ? updateProperty(databaseId, change.property)
-          : deleteProperty(databaseId, change.propertyId),
+          ? updateProperty(databaseId, change.property, offline)
+          : deleteProperty(databaseId, change.propertyId, offline)
+    },
     onMutate: async (change) => {
       if (change.kind !== 'update') return { undo: () => {}, keepRows: change.kind === 'add' }
       await queryClient.cancelQueries({ queryKey: databaseKey(databaseId) })
@@ -391,7 +420,12 @@ export function useRenameDatabase(databaseId: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationKey: SAVE_MUTATION_KEY,
-    mutationFn: (title: string) => renameDatabase(databaseId, title),
+    mutationFn: (title: string) =>
+      renameDatabase(databaseId, title, {
+        label: 'le titre d’une base',
+        key: `database-title:${databaseId}`,
+        result: () => null,
+      }),
     onMutate: (title) => ({
       undo: patchDatabase(queryClient, databaseId, (database) => ({ ...database, title })),
     }),
@@ -422,7 +456,24 @@ export function useUpdateViewConfig(databaseId: string) {
     mutationKey: SAVE_MUTATION_KEY,
     // keepalive : la requête survit à un rechargement juste après le changement.
     mutationFn: ({ viewId, config }: { viewId: string; config: ViewConfig }) =>
-      updateView(viewId, { config }, { keepalive: true }),
+      updateView(
+        viewId,
+        { config },
+        {
+          keepalive: true,
+          offline: {
+            label: 'les filtres, tris ou colonnes d’une vue',
+            key: `view-config:${viewId}`,
+            result: () => {
+              const view = queryClient
+                .getQueryData<DatabaseDetail>(databaseKey(databaseId))
+                ?.views.find((item) => item.id === viewId)
+              if (!view) throw new Error('Vue inconnue hors ligne.')
+              return { ...view, config }
+            },
+          },
+        },
+      ),
     onError: () => {
       void queryClient.invalidateQueries({ queryKey: databaseKey(databaseId) })
       toast.error('La vue n’a pas pu être enregistrée.')
@@ -457,10 +508,43 @@ export function useViewMutation(databaseId: string) {
         | { kind: 'duplicate'; viewId: string }
         | { kind: 'delete'; viewId: string },
     ): Promise<DatabaseView | null> => {
-      if (change.kind === 'create') return createView(databaseId, change)
-      if (change.kind === 'rename') return updateView(change.viewId, { name: change.name })
-      if (change.kind === 'duplicate') return duplicateView(change.viewId)
-      await deleteView(change.viewId)
+      const database = queryClient.getQueryData<DatabaseDetail>(databaseKey(databaseId))
+      if (change.kind === 'create') {
+        const input = { id: newId(), name: change.name, type: change.type, config: change.config }
+        return createView(databaseId, input, {
+          label: 'une vue créée',
+          result: () => localView(database, input),
+        })
+      }
+      if (change.kind === 'rename') {
+        const view = database?.views.find((item) => item.id === change.viewId)
+        return updateView(
+          change.viewId,
+          { name: change.name },
+          {
+            offline: {
+              label: 'le nom d’une vue',
+              key: `view-name:${change.viewId}`,
+              result: () => {
+                if (!view) throw new Error('Vue inconnue hors ligne.')
+                return { ...view, name: change.name.trim() || view.name }
+              },
+            },
+          },
+        )
+      }
+      if (change.kind === 'duplicate') {
+        const id = newId()
+        return duplicateView(change.viewId, id, {
+          label: 'une vue dupliquée',
+          result: () => {
+            const copy = localViewCopy(database, change.viewId, id)
+            if (!copy) throw new Error('Vue inconnue hors ligne.')
+            return copy
+          },
+        })
+      }
+      await deleteView(change.viewId, { label: 'une vue supprimée', result: () => null })
       return null
     },
     onSuccess: (view, change) => {

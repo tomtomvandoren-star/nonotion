@@ -49,7 +49,17 @@ export function useUpdateAgenda(workspaceId: string) {
     )
   const mutation = useMutation({
     mutationKey: SAVE_MUTATION_KEY,
-    mutationFn: (patch: Partial<AgendaSettings>) => updateAgenda(workspaceId, patch),
+    mutationFn: (patch: Partial<AgendaSettings>) =>
+      updateAgenda(workspaceId, patch, {
+        label: 'un réglage de l’Agenda',
+        key: `agenda:${workspaceId}`,
+        merge: 'patch',
+        result: () => {
+          const agenda = queryClient.getQueryData<Agenda>(agendaKey(workspaceId))
+          if (!agenda) throw new Error('Agenda inconnu hors ligne.')
+          return agenda
+        },
+      }),
     onMutate: async (patch) => {
       // Encore après avoir annulé un rafraîchissement en cours, qui remettrait l'état d'avant.
       await queryClient.cancelQueries({ queryKey: agendaKey(workspaceId) }, { revert: false })

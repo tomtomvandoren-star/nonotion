@@ -15,7 +15,7 @@ import {
   Sun,
   Trash2,
 } from 'lucide-react'
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,12 +29,23 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { displayTitle } from '@/features/pages/displayTitle'
 import { PageGlyph } from '@/features/pages/PageGlyph'
 import { useProfile, useTree } from '@/features/pages/queries'
 import { useNewPage } from '@/features/pages/useNewPage'
 import { logout } from '@/lib/api/auth'
+import { forgetOffline, pendingChanges } from '@/lib/offline/setup'
 import { endSession } from '@/lib/session'
 import { shortcutLabel } from '@/lib/shortcuts'
 import { cn } from '@/lib/utils'
@@ -229,11 +240,19 @@ function WorkspaceMenu() {
   const setShortcutsOpen = useUi((s) => s.setShortcutsOpen)
   const initial = (workspace?.name.replace(/^Espace de /, '') ?? '?').charAt(0).toUpperCase()
 
+  const [confirmSignOut, setConfirmSignOut] = useState(false)
   const signOut = async () => {
     await logout().catch(() => undefined)
     await endSession()
-    queryClient.clear()
+    // Applications natives : la copie locale et la file d'attente quittent l'appareil (spec 6.16).
+    if (platform.offline) await forgetOffline(queryClient)
+    else queryClient.clear()
     void navigate({ to: '/login' })
+  }
+  /** Des modifications faites hors ligne attendent encore : on prévient avant de les perdre. */
+  const askSignOut = () => {
+    if (platform.offline && pendingChanges() > 0) setConfirmSignOut(true)
+    else void signOut()
   }
 
   return (
@@ -279,10 +298,28 @@ function WorkspaceMenu() {
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => void signOut()}>
+        <DropdownMenuItem onSelect={askSignOut}>
           <LogOut /> Se déconnecter
         </DropdownMenuItem>
       </DropdownMenuContent>
+
+      <AlertDialog open={confirmSignOut} onOpenChange={setConfirmSignOut}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Se déconnecter maintenant ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Des modifications faites hors ligne n’ont pas encore été envoyées. Se déconnecter les
+              efface de cet appareil.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={() => void signOut()}>
+              Se déconnecter quand même
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DropdownMenu>
   )
 }

@@ -23,6 +23,9 @@ const userAgentData = (navigator as Navigator & { userAgentData?: { platform?: s
 
 export const webPlatform: Platform = {
   kind: 'web',
+  // Le site ne garde rien sur l'appareil. « nonotion.offline » = « 1 » l'active pour les tests de
+  // bout en bout, qui n'ont que le navigateur.
+  offline: readStorage('nonotion.offline') === '1',
   isMac: /mac|iphone|ipad/i.test(userAgentData?.platform ?? navigator.platform ?? ''),
   isTouch: window.matchMedia?.('(pointer: coarse)').matches ?? false,
   secureStorage: {

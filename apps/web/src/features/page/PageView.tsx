@@ -18,6 +18,7 @@ import {
   applyPagePatchLocally,
   queryKeys,
   SAVE_MUTATION_KEY,
+  useCreatePage,
   usePage,
   useUpdatePage,
   useWorkspaceId,
@@ -31,10 +32,12 @@ import { consumeTitleFocus, requestTitleFocus } from '@/features/pages/useNewPag
 import { ApiError } from '@/lib/api/client'
 import { createDatabase } from '@/lib/api/databases'
 import { uploadFile } from '@/lib/api/media'
-import { createPage, savePageContent } from '@/lib/api/pages'
+import { savePageContent } from '@/lib/api/pages'
+import { resolveConflict, setConflict, useOutbox, useSavedVersions } from '@/lib/offline/outbox'
 import { useDebouncedSave } from '@/lib/useDebouncedSave'
 import { cn } from '@/lib/utils'
 import { useUi } from '@/stores/ui'
+import { ConflictManager } from './ConflictManager'
 import { CoverPicker } from './CoverPicker'
 import { coverStyle, randomCover } from './covers'
 import { IconPicker } from './IconPicker'
@@ -312,10 +315,12 @@ function PageBody({
       void navigate({ to: '/p/$pageId', params: { pageId: created.page.id } })
     },
   }
-  const [conflict, setConflict] = useState<{
-    document: NonotionBlock[]
-    serverVersion: number
-  } | null>(null)
+  // Modifiée ici et ailleurs depuis la même version : à résoudre (spec 1.3.5 et 6.16). Gardé avec
+  // la file d'attente : un conflit trouvé au retour de la connexion attend qu'on ouvre la page.
+  const conflict = useOutbox((state) => state.conflicts[page.id]) ?? null
+  const [managing, setManaging] = useState(false)
+  const createPage = useCreatePage()
+  const label = `le contenu de « ${page.title || 'Sans titre'} »`
   // Contenu de départ de l'éditeur ; « revision » le remonte quand on affiche une autre version.
   const [initial, setInitial] = useState(() => ({
     revision: 0,
@@ -326,8 +331,15 @@ function PageBody({
 
   const saveContent = useMutation({
     mutationKey: SAVE_MUTATION_KEY,
+    // Hors ligne (applications natives), le document attend dans la file : la version ne change pas.
     mutationFn: ({ document, baseVersion }: { document: NonotionBlock[]; baseVersion: number }) =>
-      savePageContent(page.id, document, baseVersion),
+      savePageContent(page.id, document, baseVersion, {
+        label,
+        key: `content:${page.id}`,
+        merge: 'content',
+        pageId: page.id,
+        result: () => ({ version: baseVersion }),
+      }),
   })
 
   /**
@@ -345,7 +357,14 @@ function PageBody({
       } catch (error) {
         if (error instanceof ApiError && error.status === 409) {
           const serverVersion = (error.body as { version?: number } | null)?.version ?? from
-          setConflict({ document, serverVersion })
+          setConflict({
+            pageId: page.id,
+            title: label,
+            document,
+            baseVersion: from,
+            serverVersion,
+            at: new Date().toISOString(),
+          })
         } else {
           lastSent.current = null
           toast.error('Le contenu n’a pas pu être enregistré.')
@@ -363,6 +382,12 @@ function PageBody({
     lastSent.current = json
     send(document)
   })
+
+  // Le corps envoyé par la file au retour de la connexion : l'envoi suivant repart de sa version.
+  const savedVersion = useSavedVersions((versions) => versions[page.id])
+  useEffect(() => {
+    if (savedVersion !== undefined && savedVersion > version.current) version.current = savedVersion
+  }, [savedVersion])
 
   const showVersion = useCallback((fresh: PageDetail) => {
     version.current = fresh.version
@@ -386,7 +411,8 @@ function PageBody({
   }, [page, save, conflict, editorRef, showVersion])
 
   const reload = async () => {
-    setConflict(null)
+    resolveConflict(page.id)
+    setManaging(false)
     await queryClient.invalidateQueries({ queryKey: queryKeys.page(page.id) })
     const fresh = queryClient.getQueryData<PageDetail>(queryKeys.page(page.id))
     if (fresh) showVersion(fresh)
@@ -394,16 +420,17 @@ function PageBody({
 
   const overwrite = () => {
     if (!conflict) return
-    setConflict(null)
-    send(conflict.document, conflict.serverVersion)
+    resolveConflict(page.id)
+    setManaging(false)
+    // Le document gardé avec le conflit : c'est lui qu'on choisit, même si l'éditeur a été rechargé.
+    send((conflict.document ?? []) as NonotionBlock[], conflict.serverVersion)
   }
 
   /** « / Nouvelle page » et « / Lien vers une page ». */
   const pages: PageActions = {
+    // Par le même chemin que « Nouvelle page » : hors ligne, la sous-page existe aussitôt.
     createSubpage: async () => {
-      const created = await createPage(workspaceId, { parent_page_id: page.id })
-      queryClient.setQueryData(queryKeys.page(created.id), created)
-      await queryClient.invalidateQueries({ queryKey: queryKeys.tree(workspaceId) })
+      const created = await createPage.mutateAsync({ parent_page_id: page.id })
       setExpanded(page.id, true)
       return created.id
     },
@@ -446,23 +473,42 @@ function PageBody({
         </Suspense>
       </div>
 
-      <AlertDialog open={conflict !== null}>
+      <AlertDialog open={conflict !== null && !managing}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Cette page a été modifiée ailleurs</AlertDialogTitle>
             <AlertDialogDescription>
-              Elle a changé sur un autre appareil depuis que vous l’avez ouverte. Rechargez-la pour
-              voir la dernière version, ou écrasez-la avec la vôtre.
+              Elle a changé sur un autre appareil depuis votre version. Rechargez-la pour prendre la
+              dernière, écrasez-la avec la vôtre, ou comparez les deux avant de choisir.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="sm:flex-wrap">
             <AlertDialogCancel onClick={() => void reload()}>Recharger</AlertDialogCancel>
+            <AlertDialogCancel
+              variant="secondary"
+              onClick={(event) => {
+                // Le mode « Gestion de conflit » remplace la fenêtre ; le conflit reste à résoudre.
+                event.preventDefault()
+                setManaging(true)
+              }}
+            >
+              Gestion de conflit
+            </AlertDialogCancel>
             <AlertDialogAction variant="destructive" onClick={overwrite}>
               Écraser avec ma version
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {conflict && managing && (
+        <ConflictManager
+          conflict={conflict}
+          onReload={() => void reload()}
+          onOverwrite={overwrite}
+          onClose={() => setManaging(false)}
+        />
+      )}
     </>
   )
 }
