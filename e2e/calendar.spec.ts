@@ -20,9 +20,11 @@ const days = (page: Page) =>
     const pad = (n: number) => String(n).padStart(2, '0')
     const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
     const today = new Date()
-    // Un autre jour du mois affiché, à une semaine d'écart si possible.
+    // Un jour voisin dans la même semaine (elles commencent le lundi) : toujours dans la grille du
+    // mois, et à la même hauteur qu'aujourd'hui. Une semaine plus bas, la case peut être hors de
+    // l'écran quand le mois tient sur six lignes, et le glisser n'y arrive pas.
     const other = new Date(today)
-    other.setDate(today.getDate() + (today.getDate() > 20 ? -7 : 7))
+    other.setDate(today.getDate() + (today.getDay() === 0 ? -1 : 1))
     const label = (d: Date) =>
       new Intl.DateTimeFormat('fr-FR', {
         weekday: 'long',

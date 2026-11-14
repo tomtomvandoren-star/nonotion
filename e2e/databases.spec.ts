@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
-import { createPage, editorOf, signUpAndOpen } from './helpers'
+import { createPage, editorOf, expectOnTop, signUpAndOpen } from './helpers'
 
 /** Une page neuve avec une base en ligne créée par « /base de données » (3 lignes vides). */
 async function openDatabase(page: Page, request: Parameters<typeof signUpAndOpen>[1]) {
@@ -235,7 +235,16 @@ test.describe('6.10 Vue Tableau', () => {
     await addProperty(page, 'Jetable', 'Texte')
     await page.getByRole('button', { name: 'Colonne Jetable' }).click()
     await page.getByRole('menuitem', { name: 'Supprimer la propriété' }).click()
+    // La confirmation est une fenêtre simple, vraiment au-dessus de la page (pas seulement présente).
+    await expectOnTop(
+      page.getByRole('alertdialog', { name: 'Supprimer la propriété « Jetable » ?' }),
+    )
     await page.getByRole('button', { name: 'Supprimer', exact: true }).click()
+    await expect(page.getByRole('alertdialog')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Colonne Jetable' })).toHaveCount(0)
+    // Supprimée pour de bon : elle ne revient pas après rechargement.
+    await page.reload()
+    await expect(page.getByRole('button', { name: 'Colonne Nom' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Colonne Jetable' })).toHaveCount(0)
   })
 
