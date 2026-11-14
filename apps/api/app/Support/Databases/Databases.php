@@ -109,6 +109,10 @@ class Databases
             'title' => $attributes['title'] ?? '',
             'position' => $attributes['position'] ?? self::positionAtEnd($database),
         ]);
+        // Créée hors ligne (spec 6.16) : l'identifiant choisi par l'appareil.
+        if (! empty($attributes['id'])) {
+            $row->id = $attributes['id'];
+        }
         $properties = [...self::defaultValues($database), ...($attributes['properties'] ?? [])];
         $row->forceFill(['database_id' => $database->id, 'properties' => $properties])->save();
 

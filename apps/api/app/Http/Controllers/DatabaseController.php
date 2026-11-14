@@ -9,6 +9,7 @@ use App\Models\Database;
 use App\Models\Page;
 use App\Models\Workspace;
 use App\Support\Calendars\CalendarSync;
+use App\Support\ClientId;
 use App\Support\Databases\Databases;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Gate;
@@ -63,7 +64,14 @@ class DatabaseController extends Controller
     {
         Gate::authorize('update', $database);
 
+        // Déjà reçue (le même envoi répété après une coupure) : la ligne existe, rien de plus.
+        $existing = ClientId::existing(Page::class, $request->input('id'), $database->workspace_id);
+        if ($existing !== null) {
+            return response()->json(['data' => Databases::row($existing)]);
+        }
+
         $row = Databases::createRow($database, [
+            'id' => $request->input('id'),
             'title' => $request->input('title'),
             'properties' => Databases::validateValues($database, $request->input('properties', [])),
             'position' => $request->input('position'),

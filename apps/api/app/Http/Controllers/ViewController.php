@@ -6,9 +6,11 @@ use App\Http\Requests\Databases\StoreViewRequest;
 use App\Http\Requests\Databases\UpdateViewRequest;
 use App\Models\Database;
 use App\Models\View;
+use App\Support\ClientId;
 use App\Support\Databases\Databases;
 use App\Support\FractionalIndex;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -20,7 +22,13 @@ class ViewController extends Controller
     {
         Gate::authorize('update', $database);
 
-        $view = View::create([
+        // Déjà reçue (le même envoi répété après une coupure) : la vue existe, rien de plus.
+        $existing = ClientId::existing(View::class, $request->input('id'), $database->workspace_id);
+        if ($existing !== null) {
+            return response()->json(['data' => Databases::view($existing)]);
+        }
+
+        $view = new View([
             'workspace_id' => $database->workspace_id,
             'database_id' => $database->id,
             'name' => $request->string('name')->trim()->value() ?: 'Vue',
@@ -28,6 +36,10 @@ class ViewController extends Controller
             'position' => self::positionAtEnd($database->id),
             'config' => $request->validated('config') ?? [],
         ]);
+        if ($request->filled('id')) {
+            $view->id = $request->input('id');
+        }
+        $view->save();
 
         return response()->json(['data' => Databases::view($view->refresh())], 201);
     }
@@ -52,9 +64,16 @@ class ViewController extends Controller
         return response()->json(['data' => Databases::view($view)]);
     }
 
-    public function duplicate(View $view): JsonResponse
+    public function duplicate(Request $request, View $view): JsonResponse
     {
         Gate::authorize('update', $view);
+
+        // La copie peut avoir été faite hors ligne (spec 6.16) : son identifiant vient de l'appareil.
+        $request->validate(['id' => ClientId::rules()]);
+        $existing = ClientId::existing(View::class, $request->input('id'), $view->workspace_id);
+        if ($existing !== null) {
+            return response()->json(['data' => Databases::view($existing)]);
+        }
 
         $next = DB::table('views')
             ->where('database_id', $view->database_id)
@@ -64,6 +83,9 @@ class ViewController extends Controller
             ->value('position');
 
         $copy = $view->replicate();
+        if ($request->filled('id')) {
+            $copy->id = $request->input('id');
+        }
         $copy->name = mb_substr($view->name.' (copie)', 0, 100);
         $copy->position = FractionalIndex::between($view->position, $next);
         $copy->save();

@@ -9,6 +9,7 @@ use App\Http\Controllers\CronController;
 use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\LinkPreviewController;
+use App\Http\Controllers\OfflineController;
 use App\Http\Controllers\PageController;
 use App\Http\Controllers\PropertyController;
 use App\Http\Controllers\SearchController;
@@ -50,6 +51,8 @@ Route::middleware(['auth:sanctum', 'throttle:240,1'])->group(function () {
     Route::post('/workspaces/{workspace}/pages', [PageController::class, 'store']);
     Route::get('/workspaces/{workspace}/trash', [TrashController::class, 'index']);
     Route::get('/workspaces/{workspace}/search', SearchController::class);
+    // Copie de l'espace de travail pour les applications natives, hors ligne (spec 6.16).
+    Route::get('/workspaces/{workspace}/offline', [OfflineController::class, 'show']);
     Route::get('/workspaces/{workspace}/agenda', [AgendaController::class, 'show']);
     Route::post('/workspaces/{workspace}/calendar-accounts/google', [CalendarAccountController::class, 'google']);
     Route::delete('/calendar-accounts/{account}', [CalendarAccountController::class, 'destroy']);

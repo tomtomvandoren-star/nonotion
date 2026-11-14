@@ -12,6 +12,7 @@ use App\Models\Page;
 use App\Models\Workspace;
 use App\Support\BlockText;
 use App\Support\Calendars\CalendarSync;
+use App\Support\ClientId;
 use App\Support\Databases\Databases;
 use App\Support\Databases\PageCopier;
 use App\Support\Databases\Recurrence;
@@ -48,18 +49,28 @@ class PageController extends Controller
     {
         Gate::authorize('createPage', $workspace);
 
+        // Déjà reçue (le même envoi répété après une coupure) : la page existe, rien de plus.
+        $existing = ClientId::existing(Page::class, $request->input('id'), $workspace->id);
+        if ($existing !== null) {
+            return response()->json(['data' => self::detail($existing)]);
+        }
+
         $parentId = $request->input('parent_page_id');
         if ($parentId !== null) {
             $this->findParent($workspace->id, $parentId);
         }
 
-        $page = Page::create([
+        $page = new Page([
             'workspace_id' => $workspace->id,
             'parent_page_id' => $parentId,
             'title' => $request->input('title') ?? '',
             'icon' => $request->input('icon'),
             'position' => $request->input('position') ?? Page::positionAtEnd($workspace->id, $parentId),
         ]);
+        if ($request->filled('id')) {
+            $page->id = $request->input('id');
+        }
+        $page->save();
 
         return response()->json(['data' => self::detail($page->refresh())], 201);
     }
