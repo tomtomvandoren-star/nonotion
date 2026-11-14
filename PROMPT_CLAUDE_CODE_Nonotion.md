@@ -110,7 +110,7 @@ Les installateurs desktop peuvent être mis en téléchargement dans `/downloads
 7. **dnd-kit** : capteurs souris, **tactile avec appui long (~250 ms)** et clavier.
 8. **Tests multi-moteurs** : Playwright sur Chromium, WebKit et Firefox.
 9. **Secrets** : le client ne contient que l'adresse de l'API. Le fichier `.env` du serveur n'est **jamais** versionné. La clé `APP_KEY` de Laravel (qui chiffre les liens d'agenda) doit être **sauvegardée** : si elle est perdue, les liens chiffrés ne sont plus lisibles.
-10. **Seul le jeton d'authentification est conservé côté client** ; toutes les données vivent en base.
+10. **Seul le jeton d'authentification est conservé côté client** ; toutes les données vivent en base. Exception (phase 11) : les **applications natives** gardent une copie locale de ce qu'elles ont chargé et les modifications pas encore envoyées, pour travailler hors ligne (6.16). Le site web, lui, ne garde rien.
 11. **Appels réseau économes** (hébergement partagé) : pagination partout, compression gzip activée, requêtes groupées, rafraîchissement périodique espacé et suspendu quand l'application n'est pas visible.
 
 ### 1.7 Risques connus et plans B
@@ -548,6 +548,410 @@ Below is the detailed technical specification and UX intent required for impleme
   - Un autre utilisateur ne voit ni les comptes ni les événements ; aucune réponse de l'API ne contient de jeton ou de mot de passe.
   - Avec tes vrais comptes : Google Agenda et iCloud connectés, un événement créé de chaque côté apparaît de l'autre.
 
+### 6.16 Hors ligne et gestion des conflits (applications natives) : phase 11
+
+**Demande** (14 novembre, mot pour mot) : « Il faut que quand j'utilise une application native, donc Windows, Mac OS, iOS, Android ou Linux, et que je n'ai pas de connexion Internet, les changements se fassent en local et puis quand la connexion est retrouvée, se fasse en synchronisation avec le serveur. Si il y a un conflit avec le serveur il faut proposer l'option actuelle "Ecraser avec ma version" ou "Recharger" et aussi rajouter la possibilité d'ouvrir le mode "Gestion de conflit". Dans ce mode "Gestion de conflit" où on peut voir les deux versions et on peut choisir encore "Ecraser avec ma version" ou "Recharger". »
+
+**Mise en œuvre proposée** :
+
+- **Rôle** : continuer à écrire dans le train, en avion ou sans réseau, sans perdre une ligne ; tout repart tout seul au retour de la connexion.
+- **Où** : les applications pour ordinateur (Tauri) et pour téléphone (Capacitor). Le site web ne change pas : il ne garde rien sur l'appareil (1.6.10).
+- **Lecture hors ligne** : l'application garde sur l'appareil (IndexedDB de la vue web) une copie de ce qu'elle a chargé : arbre des pages, pages, bases et leurs vues, réglages de l'Agenda. Une fois en ligne, elle tient cette copie à jour pour **tout l'espace de travail** par un seul appel incrémental (`GET /api/workspaces/{id}/offline?since=…` : les pages et les bases modifiées depuis, et la liste de celles qui existent encore), au démarrage, au retour de la connexion et toutes les 5 minutes. Hors ligne, on ouvre donc n'importe quelle page.
+- **Écriture hors ligne** : chaque modification s'applique tout de suite à l'écran et à la copie locale, puis entre dans une **file d'attente gardée sur l'appareil** (elle survit à la fermeture de l'application), envoyée **dans l'ordre** dès que le serveur répond. Deux modifications du même objet attendant ensemble n'en font qu'une (le dernier document d'une page, les champs d'une ligne réunis). Ce qui fonctionne hors ligne : le corps des pages, titre, icône, couverture, favori, créer, déplacer, mettre à la corbeille et restaurer une page ; créer une ligne et changer ses propriétés ; propriétés, vues, filtres et tris d'une base ; réglages de l'Agenda. Les créations hors ligne reçoivent leur identifiant (ULID) sur l'appareil ; l'API les accepte, et le même envoi répété ne crée jamais de doublon.
+- **Ce qui demande une connexion** (le bouton le dit : « Indisponible hors ligne ») : envoyer un fichier, aperçu de lien, importer un agenda, connecter Google ou iCloud, publier le lien ICS d'une base, la recherche plein texte (la recherche dans les titres reste possible), créer une base de données.
+- **Indicateur** : dans la barre du haut, à la place de « Enregistré » : « Hors ligne · 3 modifications en attente », puis « Synchronisation… », puis « Enregistré ». Intention : savoir sans chercher si son travail est parti.
+- **Conflits** :
+  - **Corps d'une page** : verrouillage optimiste (1.3.5) comme aujourd'hui. Si la page a changé sur le serveur depuis la version de départ, la fenêtre « Cette page a été modifiée ailleurs » propose **« Recharger »**, **« Écraser avec ma version »** et **« Gestion de conflit »**. Si la page n'est pas ouverte au moment de la synchronisation, le conflit est gardé et signalé (« 1 conflit à résoudre » dans la barre du haut) ; l'ouvrir mène à la page et à la fenêtre.
+  - **Mode « Gestion de conflit »** : un écran qui montre **les deux versions côte à côte** (sur téléphone : l'une sous l'autre, ou par onglets « Ma version » / « Version du serveur »), en lecture seule, avec les blocs qui diffèrent surlignés (ajouté, supprimé, modifié), et les deux mêmes choix : « Écraser avec ma version » et « Recharger » (prendre la version du serveur). Intention : décider en voyant, pas à l'aveugle.
+  - **Autres modifications** (titre, propriétés, vues…) : la dernière arrivée l'emporte, comme aujourd'hui entre deux appareils en ligne.
+  - Une modification refusée par le serveur (objet supprimé entre-temps, valeur devenue invalide) n'est pas rejouée sans fin : elle est retirée de la file avec un message qui la nomme.
+- **Sécurité** : la copie locale vit dans le dossier privé de l'application ; se déconnecter l'efface, file d'attente comprise (avec une confirmation si des modifications n'ont pas encore été envoyées).
+- **Critères d'acceptation** :
+  - Hors ligne, l'application ouvre une page jamais ouverte sur cet appareil (copie de l'espace de travail).
+  - Hors ligne, modifier le corps et le titre d'une page, créer une page et une ligne de base, cocher une tâche : tout s'affiche ; fermer et rouvrir l'application hors ligne : tout est encore là.
+  - Au retour de la connexion, tout arrive sur le serveur, dans l'ordre, sans doublon ; l'indicateur passe à « Enregistré ».
+  - La même page modifiée sur un autre appareil pendant ce temps : la fenêtre propose les trois choix ; « Gestion de conflit » montre les deux versions et les différences ; chacun des deux choix donne le bon résultat sur le serveur.
+  - Se déconnecter efface la copie locale.
+  - Le site web garde son comportement (rien sur l'appareil).
+
+### 6.17 Planifier (disponibilités et liens de planification) : phase 12
+
+**Cahier des charges fourni** (texte d'origine ; il vaut pour la page Agenda) :
+
+````markdown
+# Spécification : section « Planifier » (Scheduling)
+
+Document d'instructions pour implémenter, dans une application de type calendrier, une fonctionnalité de planification inspirée de Notion Calendar. Le texte est volontairement générique : il décrit le comportement, le modèle de données et les algorithmes, sans présupposer de langage ni de framework.
+
+## Légende de fiabilité
+
+- **[Doc]** : comportement documenté publiquement par Notion Calendar.
+- **[Déduit]** : mécanisme que la documentation ne détaille pas, reconstruit par logique.
+- **[Proposition]** : choix de conception recommandé pour une réimplémentation, non documenté par Notion.
+
+---
+
+## 1. Vue d'ensemble
+
+La section « Planifier » regroupe deux fonctions complémentaires :
+
+1. **Voir les disponibilités des autres** : saisir le nom d'une personne pour superposer son agenda au sien et repérer un créneau commun.
+2. **Partager les siennes** : créer des **liens de planification** (page de réservation publique) où un invité choisit un créneau parmi les disponibilités de l'utilisateur.
+
+Une fois un créneau réservé, l'événement apparaît automatiquement dans l'agenda de l'organisateur **[Doc]**.
+
+### Éléments d'interface de la section (barre latérale gauche)
+
+| Élément | Rôle |
+|---|---|
+| Titre « Planifier » | En-tête de section |
+| Icône lien | Accès à la création et à la liste des liens de planification **[Déduit]** |
+| Icône œil | Masquer ou afficher le contenu de la section **[Proposition]** : la fonction exacte n'est pas documentée |
+| Champ « Entrez le nom d'une personne… » | Recherche d'une personne pour afficher son agenda en superposition |
+
+### Raccourcis clavier associés
+
+| Raccourci | Action |
+|---|---|
+| `S` | Ouvrir la gestion des liens de planification **[Doc]** |
+| `P` | Afficher le calendrier d'une personne (superposition) |
+| `Ctrl + K` | Palette de commandes (recherche, actions) |
+| `Échap` | Fermer l'agenda d'une personne affichée en superposition **[Doc]** |
+
+---
+
+## 2. Fonction A : voir les disponibilités d'une personne
+
+### 2.1 Comportement attendu
+
+1. L'utilisateur tape un nom ou une adresse e-mail dans le champ de recherche.
+2. Une liste de suggestions apparaît (personnes autorisées uniquement, voir 2.3).
+3. En sélectionnant une personne, son agenda s'ajoute à la grille en superposition, dans une couleur distincte.
+4. L'utilisateur repère visuellement les plages où lui et l'autre sont libres.
+5. `Échap` ou la croix à côté de la personne ferme la superposition **[Doc]**.
+6. Option **[Doc]** : l'agenda d'une personne peut être épinglé dans la liste de la barre latérale pour rester visible, et retiré ensuite.
+7. Option **[Doc]** : glisser une personne sur la grille crée un rendez-vous en tête-à-tête, avec titre, horaire et participant préremplis, et la visioconférence ajoutée selon les préférences de l'utilisateur.
+
+### 2.2 Principe : ne partager que « libre / occupé »
+
+Dans Notion Calendar, voir l'agenda d'un collègue ne nécessite pas qu'il ait partagé son calendrier **[Doc]**. Mécanisme **[Déduit]** : le système lit uniquement l'information libre/occupé de la personne, jamais le titre, la description ni les participants de ses événements.
+
+**Règle à implémenter :** la superposition affiche des blocs « Occupé » anonymes. Aucun détail d'événement ne doit être renvoyé par l'API à un autre utilisateur.
+
+### 2.3 Qui peut voir qui ?
+
+Dans Notion Calendar, cette fonction est liée à l'appartenance à la même organisation Google Workspace **[Doc]**. Pour une réimplémentation **[Proposition]** :
+
+- Définir un périmètre : même espace de travail, même organisation ou contacts explicitement connectés.
+- Prévoir un réglage par utilisateur : visibilité libre/occupé (tout le monde dans l'espace de travail / personne).
+- La recherche ne doit jamais renvoyer des personnes hors du périmètre.
+
+### 2.4 API suggérée
+
+```
+GET  /api/people/search?q=<texte>                     -> liste de personnes autorisées
+GET  /api/people/:id/freebusy?from=<ISO>&to=<ISO>     -> [{ start, end }] (blocs occupés, UTC)
+```
+
+Le front convertit les blocs UTC dans le fuseau d'affichage de l'utilisateur.
+
+---
+
+## 3. Fonction B : liens de planification
+
+### 3.1 Principe
+
+Un lien de planification est une URL publique. Quiconque ouvre le lien voit les disponibilités de l'organisateur et choisit un créneau. Le rendez-vous est alors créé automatiquement dans l'agenda de l'organisateur **[Doc]**.
+
+Il existe **deux types** de liens **[Doc]** :
+
+| | Lien ponctuel (*one-off*) | Lien récurrent (*recurring*) |
+|---|---|---|
+| Usage typique | Rencontrer une personne précise à un moment précis | Situations fréquentes avec des personnes différentes (entretiens utilisateurs, ventes, permanences) |
+| Définition des plages | Dates et heures précises, tracées sur le calendrier ou saisies | Horaires types par jour de la semaine, qui se répètent |
+| Réutilisation | Option « lien à usage unique » | Plusieurs réservations possibles |
+| Replanification par l'invité | Impossible si usage unique | Possible |
+
+### 3.2 Création d'un lien : flux utilisateur **[Doc]**
+
+1. Ouvrir « Scheduling » (raccourci `S`).
+2. Choisir « Créer un lien récurrent » ou « Créer un lien ponctuel ».
+3. Définir les disponibilités :
+   - **Récurrent** : saisir les heures disponibles pour chaque jour de la semaine ; un bouton `+` permet d'ajouter plusieurs plages le même jour.
+   - **Ponctuel** : glisser sur le calendrier pour tracer des plages, ou saisir les heures manuellement.
+4. Retirer des disponibilités :
+   - **Récurrent** : menu `•••` puis « Vider le jour ».
+   - **Ponctuel** : menu `•••` puis « Supprimer » sur la plage.
+5. Personnaliser l'URL (« Personnaliser le lien »).
+6. Cliquer sur « Créer ».
+
+### 3.3 Options d'un lien
+
+**Documentées [Doc] :**
+
+- Date d'expiration
+- Lieu
+- Lien de visioconférence
+- Numéro de téléphone
+- Fenêtre de réservation : délai minimum et délai maximum (par exemple : pas de réservation à moins de 24 h, ni à plus de 3 semaines)
+- Description
+- « Avoid conflicts » : mise à jour automatique des disponibilités selon les conflits de l'agenda
+- « Autoriser plusieurs réservations »
+- « Lien à usage unique » (ponctuel uniquement)
+
+**Nécessaires mais non documentées [Proposition] :**
+
+- **Durée du rendez-vous** (par exemple 15 / 30 / 45 / 60 min) : indispensable pour découper les plages en créneaux.
+- **Pas de découpage** (intervalle entre deux débuts de créneau possibles).
+- **Marge avant/après** (*buffer*) entre deux rendez-vous.
+- **Agenda de destination** : dans quel agenda connecté l'événement est créé.
+- **Titre** du lien et de l'événement généré.
+- **Fuseau horaire de référence** du lien (important pour le récurrent).
+
+### 3.4 Gestion des liens **[Doc]**
+
+Dans la vue « Scheduling » (`S`), tous les liens actifs sont listés. Pour chacun :
+
+- Icône lien : copier l'URL dans le presse-papiers.
+- Menu `•••` : copier ou modifier le lien.
+- **[Proposition]** : désactiver, dupliquer et supprimer un lien ; afficher le nombre de réservations.
+
+---
+
+## 4. Modèle de données **[Proposition]**
+
+```
+scheduling_link
+  id, owner_id
+  type              : 'one_off' | 'recurring'
+  slug              : unique, personnalisable (URL publique)
+  title, description
+  duration_minutes
+  slot_step_minutes
+  buffer_before_minutes, buffer_after_minutes
+  timezone          : fuseau IANA de référence
+  target_calendar_id
+  avoid_conflicts   : bool
+  allow_multiple_bookings : bool
+  single_use        : bool (one_off uniquement)
+  min_notice_minutes, max_advance_days
+  location_text, video_provider, video_url, phone
+  expires_at        : nullable
+  status            : 'active' | 'disabled' | 'expired' | 'consumed'
+  created_at, updated_at
+
+availability_rule            (type = recurring)
+  id, link_id
+  weekday           : 0..6
+  start_local_time  : 'HH:MM'  (dans le fuseau du lien)
+  end_local_time    : 'HH:MM'
+
+availability_range           (type = one_off)
+  id, link_id
+  start_at, end_at  : UTC
+
+booking
+  id, link_id
+  event_id          : événement créé dans l'agenda
+  invitee_name, invitee_email
+  start_at, end_at  : UTC
+  status            : 'confirmed' | 'cancelled'
+  manage_token_hash : hash du jeton de replanification/annulation courant
+  cancel_reason     : nullable
+  created_at
+```
+
+Contrainte d'unicité à prévoir pour éviter les doubles réservations (voir 6.2).
+
+---
+
+## 5. Génération des créneaux proposés
+
+La page publique affiche des créneaux calculés dynamiquement, jamais stockés.
+
+### 5.1 Algorithme
+
+```
+fonction calculer_creneaux(lien, fenetre_visible):
+  1. bornes = [now + min_notice, now + max_advance] ∩ fenetre_visible
+     (et avant expires_at si défini)
+
+  2. plages_disponibles =
+       si lien.type == 'recurring':
+         pour chaque jour de bornes, appliquer les availability_rule du weekday,
+         en interprétant les heures dans lien.timezone, puis convertir en UTC
+       sinon:
+         les availability_range qui intersectent bornes
+
+  3. occupé = []
+     si avoid_conflicts:
+       occupé += événements de l'agenda de l'organisateur marqués « occupé »
+                 (sur tous les agendas pris en compte pour la disponibilité)
+     occupé += réservations confirmées de ce lien (et des autres liens du même organisateur)
+     étendre chaque bloc occupé de buffer_before / buffer_after
+
+  4. libres = plages_disponibles − occupé   (soustraction d'intervalles)
+
+  5. créneaux = découper chaque intervalle libre en créneaux de duration_minutes,
+                avec un début tous les slot_step_minutes
+
+  6. si NON allow_multiple_bookings:
+       ne garder qu'un seul créneau réservable au total
+       (dès qu'une réservation existe, plus aucun créneau n'est proposé)
+
+  7. retourner créneaux (en UTC)
+```
+
+**[Doc]** Avec « Avoid conflicts », les disponibilités se mettent à jour au fil des nouveaux conflits de l'agenda, et tant qu'il reste des plages libres, le même lien peut servir à plusieurs réservations.
+
+### 5.2 Fuseaux horaires
+
+- Stocker et transporter tous les instants en **UTC**.
+- Pour le récurrent, stocker les règles en **heure locale + fuseau IANA** (et non en UTC) afin que « lundi 9h » reste « lundi 9h » après un changement d'heure été/hiver.
+- La page publique détecte le fuseau du navigateur de l'invité, l'affiche clairement et permet de le changer.
+- Les e-mails de confirmation doivent afficher l'heure dans le fuseau de chaque destinataire.
+
+---
+
+## 6. Page de réservation publique
+
+### 6.1 Parcours de l'invité
+
+1. Il ouvre `https://<domaine>/<slug>` (aucun compte requis).
+2. Si le lien est expiré, désactivé ou consommé : afficher un message clair, sans proposer de créneau.
+3. Il voit le titre, la description, la durée, le lieu et un calendrier de créneaux disponibles dans son fuseau.
+4. Il choisit un créneau, saisit nom et e-mail (champs supplémentaires optionnels : **[Proposition]**), puis confirme.
+5. Écran de confirmation + e-mail de confirmation avec invitation de calendrier (fichier `.ics`).
+
+### 6.2 Réservation : règles critiques
+
+Au moment de confirmer, le serveur **doit revalider** le créneau (un autre invité a pu le prendre entre-temps) :
+
+1. Ouvrir une transaction.
+2. Recalculer que le créneau est toujours libre selon l'algorithme du 5.1.
+3. Créer la réservation, créer l'événement dans l'agenda cible, ajouter l'invité comme participant, générer le lien de visioconférence si configuré.
+4. Si `single_use` : passer le lien à `consumed`.
+5. Valider la transaction.
+
+En cas de conflit, renvoyer une erreur « créneau plus disponible » et rafraîchir la liste.
+
+**Protection contre la concurrence :** contrainte d'unicité ou verrou sur (organisateur, plage horaire), afin que deux requêtes simultanées ne puissent pas réserver le même créneau.
+
+### 6.3 Protection de la page publique **[Proposition]**
+
+- Limitation de débit (*rate limiting*) par IP sur la lecture des créneaux et sur la réservation.
+- Validation côté serveur des champs et de l'e-mail.
+- Ne jamais exposer, sur la page publique, les titres ou détails des événements de l'organisateur : uniquement des créneaux libres.
+- Slugs non devinables par défaut (aléatoire), personnalisables à la demande.
+
+---
+
+## 7. Replanification et annulation
+
+### 7.1 Comportement **[Doc]**
+
+- Si plusieurs réservations sont autorisées, l'invité retrouve dans la **description de l'événement** de son agenda un lien « Replanifier ou annuler cet événement ».
+- Il peut choisir un nouvel horaire ou annuler, avec la possibilité d'indiquer un **motif**.
+- Les modifications se répercutent automatiquement dans les agendas de tous les participants.
+- **Pas de replanification** pour un lien ponctuel à usage unique.
+- **Sécurité :** chaque fois qu'un lien de replanification/annulation est utilisé, un **nouveau lien est généré** et ajouté à la description de l'événement.
+
+### 7.2 Implémentation suggérée **[Proposition]**
+
+```
+GET  /manage/:token            -> affiche la réservation + créneaux disponibles
+POST /manage/:token/reschedule -> { new_start }
+POST /manage/:token/cancel     -> { reason? }
+```
+
+- Le jeton est aléatoire, long (≥ 128 bits), stocké **haché** en base.
+- À chaque utilisation réussie (replanification ou annulation) : invalider l'ancien jeton, en générer un nouveau, mettre à jour la description de l'événement avec le nouveau lien.
+- La replanification suit les mêmes règles de revalidation que la réservation initiale (6.2).
+- Notifier l'organisateur et l'invité par e-mail après chaque changement.
+
+---
+
+## 8. Synchronisation avec l'agenda
+
+**[Déduit]** La page de réservation lit les événements existants pour calculer la disponibilité, puis crée l'événement dans l'agenda de destination à la réservation. L'événement créé doit contenir :
+
+- Titre, description, lieu
+- Lien de visioconférence ou numéro de téléphone si configurés
+- L'invité en participant (nom + e-mail)
+- Le lien de gestion de la réservation (voir 7)
+
+Les modifications ou suppressions de cet événement côté organisateur doivent être répercutées sur la réservation (statut) et notifiées à l'invité.
+
+---
+
+## 9. Interface : écrans à prévoir
+
+1. **Section « Planifier » de la barre latérale** : champ de recherche de personne, icône lien, icône œil.
+2. **Vue « Scheduling » (`S`)** : liste des liens actifs avec copier / modifier / désactiver, et deux boutons de création (récurrent, ponctuel).
+3. **Éditeur de lien** :
+   - Récurrent : une ligne par jour de la semaine, plages multiples avec `+`, `•••` → « Vider le jour ».
+   - Ponctuel : sélection par glisser sur la grille du calendrier, ou saisie manuelle des heures, `•••` → « Supprimer ».
+   - Panneau d'options : voir 3.3 ; champ d'URL avec « Personnaliser le lien ».
+4. **Superposition d'agenda d'une personne** : calque coloré sur la grille, fermeture par `Échap`, épinglage possible.
+5. **Page publique de réservation** (hors application, accessible sans connexion).
+6. **Page « Replanifier ou annuler »** (accessible via jeton).
+
+---
+
+## 10. Cas limites à gérer
+
+- Lien expiré, désactivé, ou à usage unique déjà consommé.
+- Plage disponible entièrement couverte par des conflits (afficher « aucun créneau disponible »).
+- Réservation simultanée du même créneau par deux invités.
+- Changement d'heure été/hiver (règles récurrentes).
+- Invité dans un fuseau très différent (affichage clair du fuseau).
+- Événement de l'organisateur ajouté après la création d'un lien : le créneau disparaît (si `avoid_conflicts`).
+- Réservation dont l'événement a été supprimé manuellement par l'organisateur.
+- Suppression d'un lien : les réservations existantes restent valides, seule la prise de nouveaux rendez-vous est bloquée.
+- Annulation par l'invité d'un lien à usage unique : le lien ne se réactive pas, sauf choix explicite de l'organisateur.
+
+---
+
+## 11. Ordre d'implémentation recommandé
+
+1. Modèle de données et calcul libre/occupé d'un utilisateur (fonction de soustraction d'intervalles, bien testée).
+2. Création d'un lien **ponctuel** et page publique simple (liste de créneaux, réservation, création de l'événement).
+3. Protection contre les doubles réservations (transaction + contrainte d'unicité).
+4. Lien **récurrent** (règles hebdomadaires, gestion des fuseaux).
+5. Options : fenêtre de réservation, expiration, lieu, visioconférence, téléphone, description, URL personnalisée.
+6. « Avoid conflicts », plusieurs réservations, usage unique, marges.
+7. Replanification / annulation avec rotation des jetons.
+8. Vue de gestion des liens (`S`) et raccourcis clavier.
+9. Recherche de personne et superposition d'agenda (libre/occupé uniquement), épinglage, glisser pour créer un rendez-vous 1:1.
+10. E-mails de confirmation / modification / annulation avec `.ics`.
+
+---
+
+## 12. Critères d'acceptation
+
+- [ ] Je peux créer un lien ponctuel avec plusieurs plages datées et un lien récurrent avec des horaires hebdomadaires à plages multiples.
+- [ ] Un invité sans compte peut réserver depuis l'URL publique et le rendez-vous apparaît dans mon agenda.
+- [ ] Deux invités ne peuvent jamais réserver le même créneau, même simultanément.
+- [ ] Avec « Avoid conflicts », un événement que j'ajoute à mon agenda retire les créneaux correspondants.
+- [ ] Les fenêtres de réservation (délai min/max) et l'expiration sont respectées.
+- [ ] Un lien à usage unique devient inutilisable après une réservation, et n'offre pas de replanification.
+- [ ] L'invité peut replanifier ou annuler (avec motif) depuis l'événement, et chaque utilisation régénère un nouveau lien.
+- [ ] La superposition d'une personne n'expose que des blocs « occupé » anonymes, et se ferme avec `Échap`.
+- [ ] Les heures sont correctes après un changement d'heure été/hiver et pour un invité dans un autre fuseau.
+- [ ] `S` ouvre la gestion des liens, `P` ouvre la recherche d'une personne.
+````
+
+**Mise en œuvre dans Nonotion** (proposée au moment d'ajouter la phase, à valider au début de la phase 12) :
+
+- **Emplacement** : une section **« Planifier »** dans le panneau gauche de la page Agenda (6.15), sous « Mes agendas » : champ « Entrez le nom d'une personne… », icône lien (gestion des liens, raccourci `S`), icône œil (masquer ou afficher le contenu de la section). `P` place le curseur dans le champ de recherche de personne.
+- **Fonction A : voir les disponibilités d'une personne** : Nonotion n'a pas d'organisation commune comme Google Workspace, et un espace de travail n'a qu'un membre. Le périmètre proposé est donc le **consentement explicite** : dans « Planifier », « Qui peut voir mes disponibilités » liste des comptes Nonotion (par adresse e-mail) ; la recherche ne trouve que les personnes qui m'ont autorisé, et seulement en blocs « Occupé » anonymes (`GET /api/people/search`, `GET /api/people/{id}/freebusy`). Épinglage et « glisser une personne pour créer un rendez-vous » : la personne devient participante de l'élément créé (son e-mail dans une propriété Personne ou E-mail).
+- **Fonction B : liens de planification** : liens ponctuels et récurrents, options de 3.3 (durée, pas, marges, fenêtre de réservation, expiration, lieu, lien de visioconférence collé, téléphone, description, « éviter les conflits », plusieurs réservations, usage unique), **agenda de destination** = une base de l'Agenda (si elle est reliée à Google ou iCloud, le rendez-vous y part par la synchronisation de 6.15). Les occupations lues pour « éviter les conflits » : tout ce que montre l'Agenda (bases, agendas abonnés, Google, iCloud).
+- **Page publique** : `https://nonotion.thomasvandoren.be/rdv/<slug>` (le préfixe évite toute collision avec les pages de l'application), sans compte, fuseau de l'invité détecté et modifiable ; page de gestion `/rdv/gerer/<jeton>` (replanifier, annuler avec motif, jeton haché et renouvelé à chaque usage). Protection : limitation de débit, aucun titre d'événement exposé, slugs aléatoires par défaut.
+- **Réservation** : transaction avec verrou sur l'organisateur (`SELECT … FOR UPDATE`) et revalidation du créneau (6.2 du cahier) ; l'élément créé contient titre, description, lieu, visioconférence ou téléphone, l'invité, et le lien de gestion.
+- **E-mails** (envoi par l'hébergement, qui fonctionne depuis le 8 novembre) : confirmation, modification, annulation, à l'organisateur et à l'invité, avec le fichier `.ics` et l'heure dans le fuseau de chacun.
+- **Modèle de données** : celui du 4 du cahier (`scheduling_links`, `availability_rules`, `availability_ranges`, `bookings`), plus `freebusy_shares(owner_id, viewer_id)` pour la fonction A.
+- **Critères d'acceptation** : ceux du 12 du cahier.
+
 ---
 
 ## 7. Design system
@@ -601,7 +1005,9 @@ Sous ~768 px : la sidebar devient un tiroir ; les contrôles « au survol » dev
 | **8** | **Applications desktop** : emballage Tauri 2 (Windows, macOS, Linux), couche `platform/`, mises à jour, signature | Application installable et fonctionnelle sur les 3 systèmes |
 | **9** | **Agenda unifié et synchronisation** : page Agenda de l'espace (bases Nonotion, agendas ICS, Google, iCloud), « Mes agendas », pastilles de source, case de statut, synchronisation dans les deux sens avec Google (OAuth 2.0) et iCloud (CalDAV), conflits, chevauchements | Critères 6.15 validés |
 | **10** | **Applications mobiles** : emballage Capacitor (iOS, Android), interface tactile (appui long, zones sûres), notifications de rappel des tâches | Application installée sur un vrai téléphone, parcours complet validé |
-| **11** | (Plus tard) Hors-ligne, relations/rollups/formules, partage et permissions, commentaires, export flux ICS d'une base ; le temps réel collaboratif demandera un serveur hors hébergement mutualisé | À définir ensemble |
+| **11** | **Hors ligne et conflits** (applications natives) : copie locale de l'espace de travail, modifications en file d'attente synchronisées au retour de la connexion, mode « Gestion de conflit » | Critères 6.16 validés |
+| **12** | **Planifier** (page Agenda) : disponibilités d'une personne (libre/occupé), liens de planification ponctuels et récurrents, page publique de réservation, replanification et annulation, e-mails | Critères 6.17 validés |
+| **13** | (Plus tard) Relations/rollups/formules, partage et permissions, commentaires ; le temps réel collaboratif demandera un serveur hors hébergement mutualisé | À définir ensemble |
 
 **Test précoce obligatoire** : à la fin de la phase 2, construis un **build Capacitor minimal** contenant seulement l'éditeur et installe-le sur un vrai téléphone, pour détecter tôt les problèmes de clavier et de sélection de texte. Fais pareil sur Linux avec Tauri. Ne découvre pas ces problèmes en phase 10.
 

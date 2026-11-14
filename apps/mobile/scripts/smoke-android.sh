@@ -19,6 +19,21 @@ for _ in $(seq 1 30); do
     echo "Écran de connexion affiché."
     exit 0
   fi
+  # Une application du système de l'émulateur qui ne répond pas (« Pixel Launcher isn't
+  # responding ») cache l'écran : on touche « Wait », comme on le ferait, et on relance Nonotion.
+  if grep -q "isn't responding" "$OUT/ui.xml"; then
+    # bounds="[x1,y1][x2,y2]" du bouton « Wait » devient « x1 y1 x2 y2 ».
+    bounds="$(grep -o 'text="Wait"[^>]*bounds="[^"]*"' "$OUT/ui.xml" | grep -o 'bounds="[^"]*"' \
+      | head -1 | sed 's/bounds="//; s/"$//; s/\]\[/,/; s/[][]//g; s/,/ /g' || true)"
+    if [ -n "$bounds" ]; then
+      read -r x1 y1 x2 y2 <<<"$bounds"
+      echo "Fenêtre système « ne répond pas » : on attend."
+      adb shell input tap $(((x1 + x2) / 2)) $(((y1 + y2) / 2)) || true
+    else
+      adb shell input keyevent KEYCODE_BACK || true
+    fi
+    adb shell am start -W -n be.thomasvandoren.nonotion/.MainActivity > /dev/null || true
+  fi
 done
 
 adb exec-out screencap -p > "$OUT/android.png" || true
