@@ -124,7 +124,7 @@ class PublicSchedulingController extends Controller
         $link = $this->linkOf($booking);
         $organizer = User::query()->findOrFail($booking->user_id);
 
-        return response(BookingMail::ics($booking, $link, $organizer), 200, [
+        return response(BookingMail::ics($booking, $link, $organizer, Bookings::manageUrl($token)), 200, [
             'Content-Type' => 'text/calendar; charset=utf-8',
             'Content-Disposition' => 'attachment; filename="rendez-vous.ics"',
         ]);

@@ -278,10 +278,15 @@ it('l’invitation (.ics) garde son identifiant et monte de version à chaque ch
     $id = Booking::query()->withoutGlobalScopes()->sole()->id;
     expect($ics)->toContain("UID:booking-{$id}@nonotion")->toContain('SEQUENCE:0')
         ->toContain('DTSTART:20261116T130000Z')->toContain('LOCATION:Bureau 12')
-        ->toContain('mailto:marie@example.test');
+        ->toContain('mailto:marie@example.test')
+        ->toContain('Replanifier ou annuler cet événement : '.config('nonotion.frontend_url')."/rdv/gerer/{$token}");
 
     $next = $this->postJson("/api/public/bookings/{$token}/reschedule", ['start' => '2026-11-16T14:00:00Z'])->json('data.token');
-    expect($this->get("/api/public/bookings/{$next}/ics")->getContent())->toContain('SEQUENCE:1');
+    $updated = str_replace("\r\n ", '', $this->get("/api/public/bookings/{$next}/ics")->getContent());
+    expect($updated)->toContain('SEQUENCE:1')->toContain("/rdv/gerer/{$next}")->not->toContain("/rdv/gerer/{$token}");
+    // Dans l'e-mail de l'invité aussi, avec le lien du moment.
+    Mail::assertSent(BookingMail::class, fn (BookingMail $mail) => $mail->recipient === 'invitee'
+        && $mail->kind === 'rescheduled' && str_contains($mail->manageUrl ?? '', $next));
 });
 
 it('un lien désactivé, supprimé ou d’une adresse prise : rien ne se réserve, l’adresse reste unique', function () {
@@ -339,4 +344,19 @@ it('les disponibilités d’une personne : seulement si elle me l’a permis, et
     Sanctum::actingAs($carol);
     $this->getJson('/api/people?q=a')->assertOk()->assertJsonCount(0, 'data');
     $this->getJson("/api/people/{$alice->id}/freebusy?from=2026-11-16T00:00:00Z&to=2026-11-17T00:00:00Z")->assertNotFound();
+});
+
+it('les pages publiques limitent le débit, sans que lire les créneaux épuise le droit de réserver', function () {
+    $workspace = signIn();
+    $link = planningLink($workspace, planningBase($workspace));
+    app()->detectEnvironment(fn () => 'production');
+
+    foreach (range(1, 20) as $ignored) {
+        planningSlots($link['slug']);
+    }
+    $slots = planningSlots($link['slug']);
+    foreach (array_slice($slots, 0, 10) as $i => $slot) {
+        planningBook($link['slug'], $slot, ['email' => "invite{$i}@example.test"])->assertCreated();
+    }
+    planningBook($link['slug'], $slots[10], ['email' => 'encore@example.test'])->assertStatus(429);
 });

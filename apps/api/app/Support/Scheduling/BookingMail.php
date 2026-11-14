@@ -56,13 +56,17 @@ class BookingMail extends Mailable
         $method = $this->kind === 'cancelled' ? 'CANCEL' : 'REQUEST';
 
         return [
-            Attachment::fromData(fn () => self::ics($this->booking, $this->link, $this->organizer), 'rendez-vous.ics')
+            Attachment::fromData(fn () => self::ics($this->booking, $this->link, $this->organizer, $this->manageUrl), 'rendez-vous.ics')
                 ->withMime("text/calendar; charset=UTF-8; method={$method}"),
         ];
     }
 
-    /** L'invitation de calendrier : même identifiant d'un envoi à l'autre, version (SEQUENCE) en hausse. */
-    public static function ics(Booking $booking, SchedulingLink $link, User $organizer): string
+    /**
+     * L'invitation de calendrier : même identifiant d'un envoi à l'autre, version (SEQUENCE) en hausse.
+     * Celle de l'invité porte dans sa description le lien « Replanifier ou annuler » du moment
+     * (spec 6.17, 7.1).
+     */
+    public static function ics(Booking $booking, SchedulingLink $link, User $organizer, ?string $manageUrl = null): string
     {
         $cancelled = $booking->status === 'cancelled';
         $calendar = new VCalendar([
@@ -83,6 +87,7 @@ class BookingMail extends Mailable
             $link->description,
             $link->video_url ? "Visioconférence : {$link->video_url}" : null,
             $link->phone ? "Téléphone : {$link->phone}" : null,
+            $manageUrl && ! $cancelled ? "Replanifier ou annuler cet événement : {$manageUrl}" : null,
         ]);
         if ($details !== []) {
             $event->add('DESCRIPTION', implode("\n", $details));

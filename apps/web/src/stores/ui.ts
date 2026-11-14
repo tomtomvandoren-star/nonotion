@@ -8,6 +8,8 @@ export const SIDEBAR_MAX = 400
 export type Theme = 'system' | 'light' | 'dark'
 /** Une page ouverte récemment, pour la recherche (spec 6.12) quand le champ est vide. */
 export type RecentPage = { id: string; title: string; icon: string | null }
+/** Une personne dont l'agenda reste affiché en superposition (spec 6.17, épinglée). */
+export type PinnedPerson = { id: string; name: string; email: string }
 const RECENT_MAX = 8
 
 interface UiState {
@@ -22,6 +24,9 @@ interface UiState {
   recentPages: RecentPage[]
   /** L'Agenda (spec 6.15) en mois, semaine ou jour : retrouvé au retour. */
   agendaMode: CalendarMode
+  /** « Planifier » (spec 6.17) : contenu de la section masqué (icône œil), personnes épinglées. */
+  planHidden: boolean
+  pinnedPeople: PinnedPerson[]
   /** La recherche (Ctrl+K) et l'aide des raccourcis (Ctrl+/) : ouvertes ou non, jamais mémorisé. */
   searchOpen: boolean
   /** La recherche ouverte pour choisir une page à lier : ce qu'on fait du choix (null : annulé). */
@@ -34,6 +39,8 @@ interface UiState {
   setActiveView: (databaseId: string, viewId: string) => void
   setTheme: (theme: Theme) => void
   setAgendaMode: (mode: CalendarMode) => void
+  setPlanHidden: (hidden: boolean) => void
+  setPinnedPeople: (people: PinnedPerson[]) => void
   rememberPage: (page: RecentPage) => void
   setSearchOpen: (open: boolean) => void
   pickPage: () => Promise<{ id: string } | null>
@@ -54,12 +61,16 @@ export const useUi = create<UiState>()(
       theme: 'system',
       recentPages: [],
       agendaMode: 'week',
+      planHidden: false,
+      pinnedPeople: [],
       searchOpen: false,
       searchPick: null,
       shortcutsOpen: false,
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
       setAgendaMode: (agendaMode) => set({ agendaMode }),
+      setPlanHidden: (planHidden) => set({ planHidden }),
+      setPinnedPeople: (pinnedPeople) => set({ pinnedPeople }),
       setSidebarWidth: (width) =>
         set({ sidebarWidth: Math.round(Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, width))) }),
       setExpanded: (pageId, expanded) =>
@@ -104,6 +115,8 @@ export const useUi = create<UiState>()(
         theme,
         recentPages,
         agendaMode,
+        planHidden,
+        pinnedPeople,
       }) => ({
         sidebarOpen,
         sidebarWidth,
@@ -112,6 +125,8 @@ export const useUi = create<UiState>()(
         theme,
         recentPages,
         agendaMode,
+        planHidden,
+        pinnedPeople,
       }),
     },
   ),

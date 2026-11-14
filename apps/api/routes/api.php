@@ -106,15 +106,15 @@ Route::middleware(['auth:sanctum', 'throttle:240,1'])->group(function () {
 
 // Pages publiques de réservation (spec 6.17) : sans compte, débit limité ; réserver, replanifier
 // et annuler encore plus.
-Route::prefix('public')->middleware('throttle:60,1')->group(function () {
+Route::prefix('public')->middleware('throttle:scheduling-read')->group(function () {
     Route::get('/scheduling/{slug}', [PublicSchedulingController::class, 'show']);
     Route::get('/scheduling/{slug}/slots', [PublicSchedulingController::class, 'slots']);
-    Route::post('/scheduling/{slug}/bookings', [PublicSchedulingController::class, 'book'])->middleware('throttle:10,1');
+    Route::post('/scheduling/{slug}/bookings', [PublicSchedulingController::class, 'book'])->middleware('throttle:scheduling-write');
     Route::get('/bookings/{token}', [PublicSchedulingController::class, 'booking']);
     Route::get('/bookings/{token}/slots', [PublicSchedulingController::class, 'bookingSlots']);
     Route::get('/bookings/{token}/ics', [PublicSchedulingController::class, 'ics']);
-    Route::post('/bookings/{token}/reschedule', [PublicSchedulingController::class, 'reschedule'])->middleware('throttle:10,1');
-    Route::post('/bookings/{token}/cancel', [PublicSchedulingController::class, 'cancel'])->middleware('throttle:10,1');
+    Route::post('/bookings/{token}/reschedule', [PublicSchedulingController::class, 'reschedule'])->middleware('throttle:scheduling-write');
+    Route::post('/bookings/{token}/cancel', [PublicSchedulingController::class, 'cancel'])->middleware('throttle:scheduling-write');
 });
 
 // Aperçu d'un lien web : chaque appel lit une page distante (gardée un jour), d'où une limite basse.

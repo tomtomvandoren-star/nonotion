@@ -40,6 +40,16 @@ class AppServiceProvider extends ServiceProvider
             ? Limit::none()
             : Limit::perMinute(10)->by($request->ip()));
 
+        // Pages publiques de Planifier (spec 6.17, 6.3), par adresse IP : lire (la page, les
+        // créneaux) et écrire (réserver, replanifier, annuler) ont chacun leur compteur, pour que
+        // parcourir les créneaux n'épuise pas le droit de réserver.
+        RateLimiter::for('scheduling-read', fn (Request $request) => app()->environment('local', 'testing')
+            ? Limit::none()
+            : Limit::perMinute(120)->by($request->ip()));
+        RateLimiter::for('scheduling-write', fn (Request $request) => app()->environment('local', 'testing')
+            ? Limit::none()
+            : Limit::perMinute(10)->by($request->ip()));
+
         // E-mail de réinitialisation en français ; le lien mène au front (SPA),
         // qui appelle ensuite POST /api/auth/reset-password.
         ResetPassword::toMailUsing(function (User $user, string $token) {

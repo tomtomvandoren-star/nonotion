@@ -40,6 +40,14 @@ const GROUPS: { title: string; items: [keys: string, label: string][] }[] = [
       ['T', 'Aujourd’hui'],
     ],
   },
+  {
+    title: 'Dans l’Agenda',
+    items: [
+      ['S', 'Liens de planification'],
+      ['P', 'Voir les disponibilités d’une personne'],
+      ['Échap', 'Fermer les disponibilités affichées'],
+    ],
+  },
 ]
 
 /**

@@ -1,9 +1,11 @@
+import type { OptionColor } from '@nonotion/shared'
 import { Plus } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { displayTitle } from '@/features/pages/displayTitle'
 import { cn } from '@/lib/utils'
 import {
   type CalendarItem,
+  type Day,
   dayLabel,
   dayOf,
   daysBetween,
@@ -25,6 +27,22 @@ import { HOUR_HEIGHT, PX_PER_MINUTE } from './useCalendarDrag'
 const dayName = new Intl.DateTimeFormat('fr-FR', { weekday: 'short' })
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour)
 
+/**
+ * Un calque sur la grille, sous les événements (spec 6.17) : les blocs « Occupé » d'une personne, ou
+ * les plages tracées d'un lien de planification. Rien de cliquable.
+ */
+export type GridOverlay = {
+  key: string
+  start: Date
+  end: Date
+  label: string
+  color: OptionColor | null
+  kind: 'busy' | 'free'
+}
+
+/** Ce qu'on peut déposer sur la grille des heures (une personne, pour un rendez-vous avec elle). */
+export type GridDrop = { type: string; onDrop: (data: string, day: Day, minutes: number) => void }
+
 /** Un élément à heure, dans la journée : il a sa place sur la grille des heures. */
 const onGrid = (item: CalendarItem) => !item.allDay && daysBetween(item.startDay, item.endDay) === 0
 
@@ -43,10 +61,14 @@ export function WeekView({
   onDragStart,
   creating,
   single = false,
+  overlays = [],
+  drop,
 }: GridProps & {
   creating: { start: Date; end: Date } | null
   /** La vue Jour : une seule colonne, la journée de `anchor`. */
   single?: boolean
+  overlays?: GridOverlay[]
+  drop?: GridDrop
 }) {
   const days = single ? [anchor] : weekDays(anchor)
   const band = layoutRow(
@@ -160,6 +182,11 @@ export function WeekView({
               now={now}
               items={items.filter((item) => onGrid(item) && overlaps(item, day, day))}
               creating={creating && dayOf(creating.start) === day ? creating : null}
+              overlays={overlays.filter(
+                (overlay) =>
+                  dayOf(overlay.start) <= day && dayOf(new Date(overlay.end.getTime() - 1)) >= day,
+              )}
+              drop={drop}
               lookOf={lookOf}
               onOpen={onOpen}
               onDragStart={onDragStart}
@@ -177,6 +204,8 @@ function DayColumn({
   now,
   items,
   creating,
+  overlays,
+  drop,
   lookOf,
   onOpen,
   onDragStart,
@@ -186,6 +215,8 @@ function DayColumn({
   now: Date
   items: CalendarItem[]
   creating: { start: Date; end: Date } | null
+  overlays: GridOverlay[]
+  drop?: GridDrop
 }) {
   const events = layoutTimed(
     items.map((item) => {
@@ -212,12 +243,58 @@ function DayColumn({
           minutes: snapMinutes(Math.floor(minutes / 15) * 15),
         })
       }}
+      onDragOver={(event) => {
+        if (drop && event.dataTransfer.types.includes(drop.type)) {
+          event.preventDefault()
+          event.dataTransfer.dropEffect = 'copy'
+        }
+      }}
+      onDrop={(event) => {
+        if (!drop || !event.dataTransfer.types.includes(drop.type)) return
+        event.preventDefault()
+        const minutes =
+          (event.clientY - event.currentTarget.getBoundingClientRect().top) / PX_PER_MINUTE
+        drop.onDrop(
+          event.dataTransfer.getData(drop.type),
+          day,
+          snapMinutes(Math.floor(minutes / 15) * 15),
+        )
+      }}
       className="relative border-l border-border"
       style={{
         height: 24 * HOUR_HEIGHT,
         backgroundImage: `repeating-linear-gradient(to bottom, transparent 0 ${HOUR_HEIGHT - 1}px, var(--border) ${HOUR_HEIGHT - 1}px ${HOUR_HEIGHT}px)`,
       }}
     >
+      {overlays.map((overlay) => {
+        const top = dayOf(overlay.start) === day ? minutesOf(overlay.start) : 0
+        const bottom = dayOf(overlay.end) === day ? minutesOf(overlay.end) : 24 * 60
+        return (
+          <div
+            key={overlay.key}
+            role="note"
+            data-overlay={overlay.kind}
+            data-color={overlay.color ?? undefined}
+            aria-label={`${overlay.label}, ${timeOf(overlay.start)} – ${timeOf(overlay.end)}`}
+            className={cn(
+              'pointer-events-none absolute inset-x-0 overflow-hidden rounded-sm px-1 text-[10px] leading-tight',
+              overlay.kind === 'busy'
+                ? 'nn-tint opacity-75'
+                : 'border border-dashed border-primary bg-primary/10 text-primary',
+            )}
+            style={{
+              top: top * PX_PER_MINUTE,
+              height: Math.max(bottom - top, 10) * PX_PER_MINUTE,
+              backgroundImage:
+                overlay.kind === 'busy'
+                  ? 'repeating-linear-gradient(135deg, transparent 0 6px, rgb(0 0 0 / 0.07) 6px 12px)'
+                  : undefined,
+            }}
+          >
+            {overlay.label}
+          </div>
+        )
+      })}
       {events.map(({ item, top, bottom, col, cols }) => {
         const look = lookOf(item)
         const { color } = look

@@ -7,7 +7,8 @@ import {
   todayIn,
   upcomingOccurrences,
 } from '@nonotion/shared'
-import { ChevronDown, Link2, Plus } from 'lucide-react'
+import { useQueries } from '@tanstack/react-query'
+import { CalendarClock, ChevronDown, Link2, Plus } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
@@ -18,9 +19,12 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { CalendarControls } from '@/features/databases/calendar/CalendarControls'
 import {
+  addDays,
   calendarItem,
   type CalendarItem,
   type Day,
+  instantAt,
+  parseDay,
   visibleDays,
 } from '@/features/databases/calendar/dates'
 import { CALENDAR_KEYS, useCalendarKeys, useSyncOnOpen } from '@/features/databases/calendar/hooks'
@@ -28,16 +32,22 @@ import { ImportCalendarPanel } from '@/features/databases/calendar/ImportCalenda
 import type { ItemLook } from '@/features/databases/calendar/look'
 import { MonthView } from '@/features/databases/calendar/MonthView'
 import { useCalendarDrag } from '@/features/databases/calendar/useCalendarDrag'
-import { WeekView } from '@/features/databases/calendar/WeekView'
+import { type GridOverlay, WeekView } from '@/features/databases/calendar/WeekView'
 import { completionFor } from '@/features/databases/completion'
 import { useCreateRow, useUpdateRow } from '@/features/databases/queries'
 import { RowPeek } from '@/features/databases/RowPeek'
 import { useNavigate } from '@tanstack/react-router'
 import { useWorkspaceId } from '@/features/pages/queries'
 import { requestTitleFocus } from '@/features/pages/useNewPage'
+import { isoUtc } from '@/features/scheduling/time'
+import { type DatedRange, fetchFreebusy, type Person, personSchema } from '@/lib/api/scheduling'
 import { useUi } from '@/stores/ui'
 import { AccountCalendarsPanel, ICloudPanel } from './AccountPanels'
 import { AgendaCalendars } from './AgendaCalendars'
+import { LinksPanel } from './plan/LinksPanel'
+import { overlaysOf, PERSON_DRAG_TYPE } from './plan/overlays'
+import { PlanSection } from './plan/PlanSection'
+import { SharesPanel } from './plan/SharesPanel'
 import { useAgenda, useAgendaDatabases } from './queries'
 
 const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -75,6 +85,17 @@ type Panel =
   | { kind: 'import' }
   | { kind: 'icloud' }
   | { kind: 'account'; accountId: string }
+  | { kind: 'links' }
+  | { kind: 'shares' }
+
+/** Une touche tapée dans un champ, un menu ou un panneau ne pilote pas l'Agenda. */
+const typing = (target: EventTarget | null) =>
+  target instanceof HTMLElement &&
+  (target.isContentEditable ||
+    Boolean(target.closest('input, textarea, select, [role="dialog"], [role="menu"]')))
+
+/** Une propriété Texte où noter avec qui est un rendez-vous, si la base en a une. */
+const PARTICIPANT_NAME = /particip|invit|avec|e-?mail|contact/i
 
 /** Les messages du retour de Google (`?connexion=`). */
 const CONNEXION_MESSAGES: Record<string, string> = {
@@ -115,6 +136,13 @@ function AgendaBody({
   const sectionRef = useRef<HTMLElement>(null)
   const updateRow = useUpdateRow()
   const createRow = useCreateRow()
+  // Planifier (spec 6.17) : la personne affichée, les épinglées, les plages d'un lien ponctuel.
+  const searchRef = useRef<HTMLInputElement>(null)
+  const [shown, setShown] = useState<Person | null>(null)
+  const pinned = useUi((s) => s.pinnedPeople)
+  const setPlanHidden = useUi((s) => s.setPlanHidden)
+  const [drawn, setDrawn] = useState<DatedRange[] | null>(null)
+  const overlayPeople = overlaysOf(shown, pinned)
 
   const hiddenDatabases = new Set(settings.hidden_databases)
   const hiddenSources = new Set(settings.hidden_sources)
@@ -164,8 +192,106 @@ function AgendaBody({
           patch: { properties: { [where.propertyId]: value } },
         })
     },
-    onCreate: (value) => void create(value),
+    onCreate: (value) => {
+      // Un lien ponctuel en cours de modification : la plage tracée devient une disponibilité.
+      if (drawn !== null && value.end && value.start.includes('T')) {
+        setDrawn([...drawn, { start: value.start, end: value.end }])
+        return
+      }
+      void create(value)
+    },
   })
+
+  // Les disponibilités des personnes affichées, sur les jours visibles.
+  const shownDays = visibleDays(mode, anchor)
+  const from = isoUtc(parseDay(shownDays[0]!))
+  const to = isoUtc(parseDay(addDays(shownDays.at(-1)!, 1)))
+  const freebusy = useQueries({
+    queries: overlayPeople.map(({ person }) => ({
+      queryKey: ['freebusy', person.id, from, to],
+      queryFn: () => fetchFreebusy(person.id, from, to),
+      refetchInterval: 60_000,
+    })),
+  })
+  const overlays: GridOverlay[] = [
+    ...overlayPeople.flatMap((overlay, i) =>
+      (freebusy[i]?.data ?? []).map((busy) => ({
+        key: `${overlay.person.id}-${busy.start}`,
+        start: new Date(busy.start),
+        end: new Date(busy.end),
+        label: `Occupé · ${overlay.person.name}`,
+        color: overlay.color,
+        kind: 'busy' as const,
+      })),
+    ),
+    ...(drawn ?? []).map((range, i) => ({
+      key: `drawn-${i}`,
+      start: new Date(range.start),
+      end: new Date(range.end),
+      label: 'Disponible',
+      color: null,
+      kind: 'free' as const,
+    })),
+  ]
+  const showPerson = (person: Person) => {
+    setShown(person)
+    // Les blocs « Occupé » se lisent sur la grille des heures.
+    if (mode === 'month') setMode('week')
+  }
+  // Une personne glissée sur la grille : un rendez-vous d'une demi-heure avec elle.
+  const dropPerson = async (data: string, day: Day, minutes: number) => {
+    const person = (() => {
+      try {
+        return personSchema.safeParse(JSON.parse(data))
+      } catch {
+        return null
+      }
+    })()
+    if (!person?.success) return
+    if (!target) {
+      toast.error('Affichez une base Nonotion dans « Mes agendas » pour y créer un élément.')
+      return
+    }
+    const participant = databases
+      .find((database) => database.id === target.id)
+      ?.schema.find((property) => property.type === 'text' && PARTICIPANT_NAME.test(property.name))
+    const row = await createRow.mutateAsync({
+      databaseId: target.id,
+      title: `Rendez-vous avec ${person.data.name}`,
+      properties: {
+        [target.date_property]: {
+          start: instantAt(day, minutes),
+          end: instantAt(day, minutes + 30),
+        },
+        ...(participant ? { [participant.id]: person.data.email } : {}),
+      },
+    })
+    setPanel({ kind: 'row', rowId: row.id })
+  }
+
+  // S : les liens de planification ; P : la recherche d'une personne ; Échap : la refermer.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey || event.altKey || event.defaultPrevented) return
+      if (event.key === 'Escape') {
+        if (!shown || document.querySelector('[role="dialog"]')) return
+        if (event.target !== searchRef.current && typing(event.target)) return
+        setShown(null)
+        return
+      }
+      const key = event.key.toLowerCase()
+      if ((key !== 's' && key !== 'p') || typing(event.target)) return
+      if (document.querySelector('[role="dialog"]')) return
+      event.preventDefault()
+      if (key === 's') setPanel({ kind: 'links' })
+      else {
+        setPlanHidden(false)
+        setTimeout(() => searchRef.current?.focus(), 0)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [shown, setPlanHidden])
 
   const lastDay = visibleDays(mode, anchor).at(-1)!
   const items: CalendarItem[] = []
@@ -302,6 +428,9 @@ function AgendaBody({
                 >
                   <Link2 aria-hidden /> Importer un agenda depuis un lien (ICS)
                 </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setTimeout(() => setPanel({ kind: 'links' }), 0)}>
+                  <CalendarClock aria-hidden /> Liens de planification
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -325,12 +454,33 @@ function AgendaBody({
             onConnectICloud={() => setPanel({ kind: 'icloud' })}
             onAccountCalendars={(account) => setPanel({ kind: 'account', accountId: account.id })}
           />
+          <div className="mt-4 border-t border-border pt-3">
+            <PlanSection
+              searchRef={searchRef}
+              overlays={overlayPeople}
+              onShow={showPerson}
+              onClose={(person) => {
+                if (shown?.id === person.id) setShown(null)
+              }}
+              onLinks={() => setPanel({ kind: 'links' })}
+              onShares={() => setPanel({ kind: 'shares' })}
+            />
+          </div>
         </div>
         <div className="min-w-0 flex-1">
           {mode === 'month' ? (
             <MonthView {...grid} />
           ) : (
-            <WeekView {...grid} creating={creating} single={mode === 'day'} />
+            <WeekView
+              {...grid}
+              creating={creating}
+              single={mode === 'day'}
+              overlays={overlays}
+              drop={{
+                type: PERSON_DRAG_TYPE,
+                onDrop: (data, day, minutes) => void dropPerson(data, day, minutes),
+              }}
+            />
           )}
         </div>
       </div>
@@ -352,6 +502,15 @@ function AgendaBody({
           onClose={closePanel}
         />
       )}
+      {panel?.kind === 'links' && (
+        <LinksPanel
+          workspaceId={workspaceId}
+          agenda={agenda}
+          drawn={{ ranges: drawn, set: setDrawn }}
+          onClose={closePanel}
+        />
+      )}
+      {panel?.kind === 'shares' && <SharesPanel onClose={closePanel} />}
       {panel?.kind === 'account' && accountOf(panel.accountId) && (
         <AccountCalendarsPanel
           workspaceId={workspaceId}

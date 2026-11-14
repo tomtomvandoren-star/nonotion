@@ -20,6 +20,7 @@ import { HomePage } from '@/features/home/HomePage'
 import { AppLayout } from '@/features/layout/AppLayout'
 import { UpdateNotifier } from '@/features/layout/UpdateNotifier'
 import { PageView } from '@/features/page/PageView'
+import { ManageBookingPage, PublicBookingPage } from '@/features/scheduling/PublicPages'
 import { getToken } from '@/lib/session'
 
 const rootRoute = createRootRoute({
@@ -123,10 +124,34 @@ const pageRoute = createRoute({
   },
 })
 
+/**
+ * Les pages publiques de Planifier (spec 6.17) : sans compte, que l'on soit connecté ou non. Le
+ * préfixe /rdv évite toute collision avec les pages de l'application.
+ */
+const bookingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/rdv/$slug',
+  component: function Booking() {
+    const { slug } = bookingRoute.useParams()
+    return <PublicBookingPage slug={slug} />
+  },
+})
+
+const manageBookingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/rdv/gerer/$token',
+  component: function ManageBooking() {
+    const { token } = manageBookingRoute.useParams()
+    return <ManageBookingPage key={token} token={token} />
+  },
+})
+
 export const router = createRouter({
   routeTree: rootRoute.addChildren([
     guestRoute.addChildren([loginRoute, registerRoute, forgotPasswordRoute, resetPasswordRoute]),
     appRoute.addChildren([homeRoute, agendaRoute, pageRoute]),
+    bookingRoute,
+    manageBookingRoute,
   ]),
 })
 
