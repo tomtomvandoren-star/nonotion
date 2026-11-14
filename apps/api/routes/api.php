@@ -7,11 +7,15 @@ use App\Http\Controllers\CalendarFeedController;
 use App\Http\Controllers\CalendarSourceController;
 use App\Http\Controllers\CronController;
 use App\Http\Controllers\DatabaseController;
+use App\Http\Controllers\FreebusyShareController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\LinkPreviewController;
 use App\Http\Controllers\OfflineController;
 use App\Http\Controllers\PageController;
+use App\Http\Controllers\PeopleController;
 use App\Http\Controllers\PropertyController;
+use App\Http\Controllers\PublicSchedulingController;
+use App\Http\Controllers\SchedulingLinkController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\TrashController;
 use App\Http\Controllers\UploadController;
@@ -51,6 +55,18 @@ Route::middleware(['auth:sanctum', 'throttle:240,1'])->group(function () {
     Route::post('/workspaces/{workspace}/pages', [PageController::class, 'store']);
     Route::get('/workspaces/{workspace}/trash', [TrashController::class, 'index']);
     Route::get('/workspaces/{workspace}/search', SearchController::class);
+    // Planifier (spec 6.17) : liens de planification, et disponibilités partagées.
+    Route::get('/workspaces/{workspace}/scheduling-links', [SchedulingLinkController::class, 'index']);
+    Route::post('/workspaces/{workspace}/scheduling-links', [SchedulingLinkController::class, 'store']);
+    Route::patch('/scheduling-links/{link}', [SchedulingLinkController::class, 'update']);
+    Route::delete('/scheduling-links/{link}', [SchedulingLinkController::class, 'destroy']);
+    Route::post('/scheduling-links/{link}/duplicate', [SchedulingLinkController::class, 'duplicate']);
+    Route::get('/scheduling-links/{link}/bookings', [SchedulingLinkController::class, 'bookings']);
+    Route::get('/freebusy-shares', [FreebusyShareController::class, 'index']);
+    Route::post('/freebusy-shares', [FreebusyShareController::class, 'store']);
+    Route::delete('/freebusy-shares/{share}', [FreebusyShareController::class, 'destroy']);
+    Route::get('/people', [PeopleController::class, 'search']);
+    Route::get('/people/{person}/freebusy', [PeopleController::class, 'freebusy'])->whereUlid('person');
     // Copie de l'espace de travail pour les applications natives, hors ligne (spec 6.16).
     Route::get('/workspaces/{workspace}/offline', [OfflineController::class, 'show']);
     Route::get('/workspaces/{workspace}/agenda', [AgendaController::class, 'show']);
@@ -86,6 +102,19 @@ Route::middleware(['auth:sanctum', 'throttle:240,1'])->group(function () {
     Route::delete('/databases/{database}/feed', [CalendarFeedController::class, 'destroy']);
     Route::patch('/calendar-sources/{source}', [CalendarSourceController::class, 'update']);
     Route::delete('/calendar-sources/{source}', [CalendarSourceController::class, 'destroy']);
+});
+
+// Pages publiques de réservation (spec 6.17) : sans compte, débit limité ; réserver, replanifier
+// et annuler encore plus.
+Route::prefix('public')->middleware('throttle:60,1')->group(function () {
+    Route::get('/scheduling/{slug}', [PublicSchedulingController::class, 'show']);
+    Route::get('/scheduling/{slug}/slots', [PublicSchedulingController::class, 'slots']);
+    Route::post('/scheduling/{slug}/bookings', [PublicSchedulingController::class, 'book'])->middleware('throttle:10,1');
+    Route::get('/bookings/{token}', [PublicSchedulingController::class, 'booking']);
+    Route::get('/bookings/{token}/slots', [PublicSchedulingController::class, 'bookingSlots']);
+    Route::get('/bookings/{token}/ics', [PublicSchedulingController::class, 'ics']);
+    Route::post('/bookings/{token}/reschedule', [PublicSchedulingController::class, 'reschedule'])->middleware('throttle:10,1');
+    Route::post('/bookings/{token}/cancel', [PublicSchedulingController::class, 'cancel'])->middleware('throttle:10,1');
 });
 
 // Aperçu d'un lien web : chaque appel lit une page distante (gardée un jour), d'où une limite basse.

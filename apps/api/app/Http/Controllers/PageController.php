@@ -16,6 +16,7 @@ use App\Support\ClientId;
 use App\Support\Databases\Databases;
 use App\Support\Databases\PageCopier;
 use App\Support\Databases\Recurrence;
+use App\Support\Scheduling\Bookings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -233,11 +234,12 @@ class PageController extends Controller
     {
         Gate::authorize('delete', $page);
 
-        Page::query()
-            ->whereIn('id', [$page->id, ...$page->descendantIds()])
-            ->update(['deleted_at' => now()]);
+        $ids = [$page->id, ...$page->descendantIds()];
+        Page::query()->whereIn('id', $ids)->update(['deleted_at' => now()]);
         // Un événement d'un agenda Google ou iCloud mis à la corbeille y est supprimé aussi.
         CalendarSync::afterTrash($page);
+        // Un rendez-vous pris par un lien de planification : annulé, l'invité prévenu (spec 6.17).
+        Bookings::afterTrash($ids);
 
         return response()->json(['status' => 'ok']);
     }
