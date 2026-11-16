@@ -56,7 +56,13 @@ async function createOn(page: Page, label: string, title: string) {
   await expect(item(page, title)).toBeVisible()
 }
 
+/**
+ * Glisse un élément sur une case. La case doit être à l'écran : un mois de six semaines dépasse la
+ * fenêtre de test, et le pointeur relâché hors de l'écran ne tombe sur rien.
+ */
 async function dragTo(page: Page, source: Locator, target: Locator) {
+  await target.scrollIntoViewIfNeeded()
+  await expect(source).toBeInViewport()
   const from = (await source.boundingBox())!
   const to = (await target.boundingBox())!
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
@@ -66,6 +72,9 @@ async function dragTo(page: Page, source: Locator, target: Locator) {
 }
 
 test.describe('6.8 Vue Calendrier', () => {
+  // Assez haute pour un mois de six semaines et le panneau « Sans date » à côté.
+  test.use({ viewport: { width: 1280, height: 1100 } })
+
   test('créer au « + » d’une case, glisser sur un autre jour, la date reste après rechargement', async ({
     page,
     request,

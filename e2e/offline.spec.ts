@@ -235,10 +235,14 @@ test('une image vue en ligne sur un autre appareil s’y affiche ensuite hors li
   browser,
 }) => {
   const { token, pageId } = await openNotebook(page, request)
-  const saved = waitForContentSave(page)
   await addImage(page)
-  await saved
   await expect.poll(() => width(page)).toBe(1)
+  // La page enregistrée sur le serveur cite l'image, avant d'ouvrir l'autre appareil.
+  await expect
+    .poll(async () => JSON.stringify((await serverPage(request, token, pageId)).content), {
+      timeout: 15_000,
+    })
+    .toMatch(/Plage\.png/)
 
   // Un autre appareil, qui n'a jamais vu l'image : il l'affiche, et en garde une copie.
   const context = await browser.newContext()
