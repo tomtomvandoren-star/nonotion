@@ -229,6 +229,25 @@ const keptFiles = (page: Page) =>
       }),
   )
 
+/** La copie locale de l'application (gardée sur l'appareil) contient-elle ce texte ? */
+const keptCopyHas = (page: Page, text: string) =>
+  page.evaluate(
+    (needle) =>
+      new Promise<boolean>((resolve) => {
+        const open = indexedDB.open('nonotion-offline')
+        open.onsuccess = () => {
+          try {
+            const read = open.result.transaction('kv').objectStore('kv').get('queries')
+            read.onsuccess = () => resolve(JSON.stringify(read.result ?? null).includes(needle))
+          } catch {
+            resolve(false)
+          }
+        }
+        open.onerror = () => resolve(false)
+      }),
+    text,
+  )
+
 test('une image vue en ligne sur un autre appareil s’y affiche ensuite hors ligne, après réouverture', async ({
   page,
   request,
@@ -256,6 +275,8 @@ test('une image vue en ligne sur un autre appareil s’y affiche ensuite hors li
   expect((await copied).status()).toBe(200)
   await expect.poll(() => width(other)).toBe(1)
   await expect.poll(() => keptFiles(other)).toBe(1)
+  // La page aussi est gardée (une seconde après l'avoir chargée) avant de couper le réseau.
+  await expect.poll(() => keptCopyHas(other, 'Plage.png')).toBe(true)
 
   // Plus de réseau du tout (ni l'API, ni les fichiers du serveur), et l'application rouverte.
   await other.route(
@@ -263,7 +284,7 @@ test('une image vue en ligne sur un autre appareil s’y affiche ensuite hors li
     (route) => route.abort(),
   )
   await other.reload()
-  await expect(image(other)).toHaveAttribute('src', /^blob:/)
+  await expect(image(other)).toHaveAttribute('src', /^blob:/, { timeout: 15_000 })
   await expect.poll(() => width(other)).toBe(1)
   await context.close()
 })
