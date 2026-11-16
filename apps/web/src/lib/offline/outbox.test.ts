@@ -5,6 +5,7 @@ import {
   enqueue,
   flushOutbox,
   loadOutbox,
+  replaceInQueue,
   resetOutbox,
   useOutbox,
   type OutboxEntry,
@@ -31,6 +32,7 @@ function setup(replies: Reply[] = []) {
     onDrained: vi.fn(),
     onRejected: vi.fn(),
     onContentSaved: vi.fn(),
+    onSent: vi.fn(),
   }
   configureOutbox(handlers)
   return { sent, ...handlers }
@@ -209,5 +211,58 @@ describe('identifiants choisis sur l’appareil', () => {
     expect(a).toMatch(/^[0-9a-hjkmnp-tv-z]{26}$/)
     expect(a < b).toBe(true)
     expect(newId()).not.toBe(newId())
+  })
+
+  it('un fichier ajouté hors ligne passe avant ce qui cite son adresse, qui est remplacée à son envoi', async () => {
+    const { sent, onSent } = setup([
+      { status: 200, data: { data: { version: 4 } } },
+      { status: 201, data: { url: 'https://n.test/uploads/a/b/plage.png' } },
+      { status: 200, data: { data: { version: 5 } } },
+    ])
+    const content = (text: string, version: number) => ({
+      method: 'PUT' as const,
+      path: 'pages/p1/content',
+      body: { content: [{ text }], version },
+      key: 'content:p1',
+      merge: 'content' as const,
+      pageId: 'p1',
+      label: 'le texte',
+    })
+    enqueue(content('avant', 3))
+    enqueue({
+      method: 'POST',
+      path: 'pages/p1/files',
+      body: { upload: { id: 'f1', name: 'plage.png', type: 'image/png' } },
+      key: 'upload:f1',
+      label: 'le fichier',
+    })
+    // Écrit après le fichier : ne se fond pas dans le texte qui le précède.
+    enqueue(content('nonotion-file:f1', 3))
+    enqueue(content('nonotion-file:f1 et la suite', 3))
+    expect(useOutbox.getState().entries.map((entry) => entry.path)).toEqual([
+      'pages/p1/content',
+      'pages/p1/files',
+      'pages/p1/content',
+    ])
+
+    // Ce que ferait l'application à l'envoi du fichier : sa vraie adresse partout.
+    onSent.mockImplementation((entry: OutboxEntry, data: unknown) => {
+      if (entry.key === 'upload:f1')
+        replaceInQueue('nonotion-file:f1', (data as { url: string }).url)
+    })
+    online()
+    await flushOutbox()
+
+    expect(sent.map((entry) => entry.path)).toEqual([
+      'pages/p1/content',
+      'pages/p1/files',
+      'pages/p1/content',
+    ])
+    // Le second envoi du texte part de la version que le premier a créée, avec la vraie adresse.
+    expect(sent[2]!.body).toEqual({
+      content: [{ text: 'https://n.test/uploads/a/b/plage.png et la suite' }],
+      version: 4,
+    })
+    expect(useOutbox.getState().entries).toEqual([])
   })
 })

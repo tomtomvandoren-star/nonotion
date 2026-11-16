@@ -73,6 +73,8 @@ interface Handlers {
   onRejected(entry: OutboxEntry, message: string): void
   /** Le corps d'une page est enregistré : sa nouvelle version. */
   onContentSaved(pageId: string, version: number): void
+  /** Une modification est arrivée (un fichier ajouté hors ligne : sa vraie adresse). */
+  onSent?(entry: OutboxEntry, data: unknown): void
 }
 
 let handlers: Handlers | null = null
@@ -117,14 +119,23 @@ function mergeBodies(merge: Merge, before: unknown, after: unknown): unknown {
   return after
 }
 
+/** Un fichier ajouté hors ligne, qui attend son envoi. */
+export const isUpload = (entry: Pick<OutboxEntry, 'body'>) =>
+  typeof entry.body === 'object' && entry.body !== null && 'upload' in entry.body
+
 /** Ajoute une modification à la file (ou la fond dans celle du même objet), puis tente l'envoi. */
 export function enqueue(entry: Omit<OutboxEntry, 'id'>) {
   useOutbox.setState((state) => {
     const same = entry.key
-      ? state.entries.findIndex((item) => item.key === entry.key && item.method === entry.method)
+      ? state.entries.findLastIndex(
+          (item) => item.key === entry.key && item.method === entry.method,
+        )
       : -1
+    // Un fichier ajouté après elle : ce qui suit peut citer son adresse, qui n'existe pas encore sur
+    // le serveur. La modification prend son tour derrière lui.
+    const uploadAfter = state.entries.slice(same + 1).some(isUpload)
     // Pas la première de la file : elle est peut-être en route, on ne la change plus.
-    if (same > 0 || (same === 0 && !state.syncing)) {
+    if (!uploadAfter && (same > 0 || (same === 0 && !state.syncing))) {
       const entries = [...state.entries]
       const before = entries[same]!
       entries[same] = {
@@ -144,6 +155,36 @@ export function enqueue(entry: Omit<OutboxEntry, 'id'>) {
 function remove(id: string) {
   useOutbox.setState((state) => ({ entries: state.entries.filter((entry) => entry.id !== id) }))
   persist()
+}
+
+/**
+ * Remplace une adresse dans tout ce qui attend encore (l'adresse locale d'un fichier ajouté hors
+ * ligne, par sa vraie adresse une fois envoyé ; par '' s'il est refusé).
+ */
+export function replaceInQueue(from: string, to: string) {
+  const needle = JSON.stringify(from).slice(1, -1)
+  const target = JSON.stringify(to).slice(1, -1)
+  useOutbox.setState((state) => ({
+    entries: state.entries.map((entry) => {
+      if (entry.body === undefined) return entry
+      const json = JSON.stringify(entry.body)
+      return json.includes(needle)
+        ? { ...entry, body: JSON.parse(json.split(needle).join(target)) as unknown }
+        : entry
+    }),
+  }))
+  persist()
+}
+
+/** Le corps d'une page enregistré : ses envois suivants partent de cette version. */
+function advanceVersion(pageId: string, version: number) {
+  useOutbox.setState((state) => ({
+    entries: state.entries.map((entry) =>
+      entry.pageId === pageId && typeof entry.body === 'object' && entry.body !== null
+        ? { ...entry, body: { ...(entry.body as object), version } }
+        : entry,
+    ),
+  }))
 }
 
 export function setConflict(conflict: PageConflict) {
@@ -168,7 +209,7 @@ let retry: ReturnType<typeof setTimeout> | null = null
 export async function flushOutbox(): Promise<void> {
   if (!handlers || useOutbox.getState().syncing || !isOnline()) return
   if (useOutbox.getState().entries.length === 0) return
-  const { send, onDrained, onRejected, onContentSaved } = handlers
+  const { send, onDrained, onRejected, onContentSaved, onSent } = handlers
   if (retry) clearTimeout(retry)
   retry = null
   useOutbox.setState({ syncing: true })
@@ -192,9 +233,12 @@ export async function flushOutbox(): Promise<void> {
         message?: string
       }
       if (result.status >= 200 && result.status < 300) {
-        if (entry.pageId && typeof data?.data?.version === 'number')
-          onContentSaved(entry.pageId, data.data.version)
         remove(entry.id)
+        if (entry.pageId && typeof data?.data?.version === 'number') {
+          advanceVersion(entry.pageId, data.data.version)
+          onContentSaved(entry.pageId, data.data.version)
+        }
+        onSent?.(entry, result.data)
       } else if (result.status === 409 && entry.pageId) {
         // Modifiée ailleurs depuis : un conflit à résoudre, avec les deux versions.
         setConflict({
@@ -217,8 +261,8 @@ export async function flushOutbox(): Promise<void> {
         break
       } else {
         // Refusée (objet supprimé entre-temps, valeur devenue invalide) : retirée, et on le dit.
-        onRejected(entry, data?.message ?? `erreur ${result.status}`)
         remove(entry.id)
+        onRejected(entry, data?.message ?? `erreur ${result.status}`)
       }
     }
   } finally {

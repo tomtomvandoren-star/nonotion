@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Pages;
 
+use App\Support\ClientId;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreUploadRequest extends FormRequest
@@ -12,6 +13,8 @@ class StoreUploadRequest extends FormRequest
         return [
             // En kilo-octets pour la règle max.
             'file' => ['required', 'file', 'max:'.(config('nonotion.uploads.max_mb') * 1024)],
+            // Choisi par l'application pour un fichier ajouté hors ligne (spec 6.16).
+            'id' => ClientId::rules(),
         ];
     }
 

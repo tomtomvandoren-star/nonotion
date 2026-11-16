@@ -57,6 +57,9 @@ class OfflineController extends Controller
             'databases' => $databases,
             'page_ids' => Page::query()->where('workspace_id', $workspace->id)->pluck('id')->all(),
             'database_ids' => $databaseIds->values()->all(),
+            // Petits, et lus en entier : l'Agenda et la corbeille s'ouvrent aussi hors ligne.
+            'agenda' => AgendaController::present($workspace),
+            'trash' => TrashController::items($workspace),
             'server_time' => $now->toIso8601String(),
         ]]);
     }

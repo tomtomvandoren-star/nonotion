@@ -181,3 +181,190 @@ test('fermée puis rouverte sans serveur : les pages et la file d’attente sont
     })
     .toContain('Avant de fermer.')
 })
+
+/*
+ * Complément du 16 novembre : les fichiers récemment utilisés gardés sur l'appareil, les fichiers
+ * ajoutés hors ligne, la recherche, l'Agenda et la corbeille hors ligne.
+ */
+
+/** Une image PNG d'un pixel. */
+const PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+  'base64',
+)
+
+const image = (page: Page) => editorOf(page).locator('[data-content-type="image"] img')
+const width = (page: Page) => image(page).evaluate((img: HTMLImageElement) => img.naturalWidth)
+
+/** Un bloc Image à la fin de la page, avec une image envoyée depuis l'appareil. */
+async function addImage(page: Page) {
+  await editorOf(page).press('End')
+  await page.keyboard.press('Enter')
+  await page.keyboard.type('/image')
+  await expect(page.locator('.bn-suggestion-menu').getByRole('option').first()).toContainText(
+    'Image',
+  )
+  await page.keyboard.press('Enter')
+  await page.getByRole('tab', { name: 'Depuis l’appareil' }).click()
+  await page
+    .locator('input[type="file"]')
+    .setInputFiles({ name: 'Plage.png', mimeType: 'image/png', buffer: PNG })
+}
+
+/** Combien de fichiers l'application garde sur l'appareil. */
+const keptFiles = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<number>((resolve) => {
+        const open = indexedDB.open('nonotion-files')
+        open.onsuccess = () => {
+          try {
+            const count = open.result.transaction('meta').objectStore('meta').count()
+            count.onsuccess = () => resolve(count.result)
+          } catch {
+            resolve(0)
+          }
+        }
+        open.onerror = () => resolve(0)
+      }),
+  )
+
+test('une image vue en ligne sur un autre appareil s’y affiche ensuite hors ligne, après réouverture', async ({
+  page,
+  request,
+  browser,
+}) => {
+  const { token, pageId } = await openNotebook(page, request)
+  const saved = waitForContentSave(page)
+  await addImage(page)
+  await saved
+  await expect.poll(() => width(page)).toBe(1)
+
+  // Un autre appareil, qui n'a jamais vu l'image : il l'affiche, et en garde une copie.
+  const context = await browser.newContext()
+  await context.addInitScript((value) => {
+    window.localStorage.setItem('nonotion.token', value)
+    window.localStorage.setItem('nonotion.offline', '1')
+  }, token)
+  const other = await context.newPage()
+  const copied = other.waitForResponse((response) => response.url().includes('/api/files/'))
+  await other.goto(new URL(`/p/${pageId}`, page.url()).href)
+  expect((await copied).status()).toBe(200)
+  await expect.poll(() => width(other)).toBe(1)
+  await expect.poll(() => keptFiles(other)).toBe(1)
+
+  // Plus de réseau du tout (ni l'API, ni les fichiers du serveur), et l'application rouverte.
+  await other.route(
+    (url) => url.pathname.startsWith('/api/') || url.pathname.startsWith('/uploads/'),
+    (route) => route.abort(),
+  )
+  await other.reload()
+  await expect(image(other)).toHaveAttribute('src', /^blob:/)
+  await expect.poll(() => width(other)).toBe(1)
+  await context.close()
+})
+
+test('une image ajoutée hors ligne s’affiche tout de suite, et arrive sur le serveur au retour', async ({
+  page,
+  request,
+}) => {
+  const { token, pageId } = await openNotebook(page, request)
+  const api = (url: URL) => url.pathname.startsWith('/api/')
+  await page.route(api, (route) => route.abort())
+  await editorOf(page).press('End')
+  await page.keyboard.type(' Puis hors ligne.')
+  await expect(indicator(page)).toHaveText(/Hors ligne/)
+
+  await addImage(page)
+  await expect(image(page)).toHaveAttribute('src', /^blob:/)
+  await expect.poll(() => width(page)).toBe(1)
+  await expect(indicator(page)).toHaveText(/Hors ligne · \d+ modifications? en attente/)
+
+  // Le serveur revient : le fichier part, et la page enregistrée cite sa vraie adresse.
+  await page.unroute(api)
+  await expect
+    .poll(async () => JSON.stringify((await serverPage(request, token, pageId)).content), {
+      timeout: 30_000,
+    })
+    .toMatch(/\/uploads\/[0-9a-z]+\/[0-9a-z]+\/Plage\.png/)
+  const content = JSON.stringify((await serverPage(request, token, pageId)).content)
+  expect(content).toContain('Puis hors ligne.')
+  expect(content).not.toContain('nonotion-file:')
+  await expect(indicator(page)).toHaveText('Enregistré')
+
+  await page.reload()
+  await expect.poll(() => width(page)).toBe(1)
+})
+
+test('hors ligne, sans les avoir ouvertes : la recherche lit le texte des pages, l’Agenda et la corbeille s’ouvrent', async ({
+  page,
+  request,
+}) => {
+  // Le compte et ses pages existent avant que l'application ne s'ouvre : rien n'y a été affiché.
+  const registered = await request.post('/api/auth/register', {
+    headers: { Accept: 'application/json' },
+    data: {
+      name: 'Testeur',
+      email: `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@nonotion.test`,
+      password: 'mot-de-passe-e2e',
+      password_confirmation: 'mot-de-passe-e2e',
+    },
+  })
+  const { token } = (await registered.json()) as { token: string }
+  const headers = { Authorization: `Bearer ${token}`, Accept: 'application/json' }
+  const me = (await (await request.get('/api/auth/me', { headers })).json()) as {
+    workspaces: { id: string }[]
+  }
+  const pages = `/api/workspaces/${me.workspaces[0]!.id}/pages`
+  const recipe = (
+    await (await request.post(pages, { headers, data: { title: 'Recettes' } })).json()
+  ).data as { id: string; version: number }
+  await request.put(`/api/pages/${recipe.id}/content`, {
+    headers,
+    data: {
+      version: recipe.version,
+      content: [
+        {
+          id: 'b1',
+          type: 'paragraph',
+          props: {},
+          content: [{ type: 'text', text: 'Tarte aux mirabelles de Lorraine', styles: {} }],
+          children: [],
+        },
+      ],
+    },
+  })
+  const draft = (
+    await (await request.post(pages, { headers, data: { title: 'Brouillon' } })).json()
+  ).data as { id: string }
+  await request.delete(`/api/pages/${draft.id}`, { headers })
+
+  await page.addInitScript((value) => {
+    window.localStorage.setItem('nonotion.token', value)
+    window.localStorage.setItem('nonotion.offline', '1')
+  }, token)
+  const copied = page.waitForResponse((response) => /\/offline(\?|$)/.test(response.url()))
+  await page.goto('/')
+  expect((await copied).status()).toBe(200)
+  await page.route(
+    (url) => url.pathname.startsWith('/api/'),
+    (route) => route.abort(),
+  )
+
+  await page.keyboard.press('ControlOrMeta+k')
+  await page.keyboard.type('mirabelles')
+  const result = page
+    .getByRole('dialog', { name: 'Rechercher' })
+    .getByRole('option', { name: /Recettes/ })
+  await expect(result).toBeVisible()
+  await expect(result.locator('mark')).toHaveText('mirabelles')
+  await page.keyboard.press('Enter')
+  await expect(editorOf(page)).toContainText('Tarte aux mirabelles de Lorraine')
+
+  await page.getByRole('link', { name: 'Agenda' }).click()
+  await expect(page.getByRole('heading', { name: 'Agenda', level: 1 })).toBeVisible()
+  await expect(page.getByText('L’Agenda n’a pas pu être chargé.')).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Corbeille' }).click()
+  await expect(page.getByRole('list', { name: 'Pages à la corbeille' })).toContainText('Brouillon')
+})

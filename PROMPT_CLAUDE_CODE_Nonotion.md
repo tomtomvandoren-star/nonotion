@@ -558,7 +558,7 @@ Below is the detailed technical specification and UX intent required for impleme
 - **Où** : les applications pour ordinateur (Tauri) et pour téléphone (Capacitor). Le site web ne change pas : il ne garde rien sur l'appareil (1.6.10).
 - **Lecture hors ligne** : l'application garde sur l'appareil (IndexedDB de la vue web) une copie de ce qu'elle a chargé : arbre des pages, pages, bases et leurs vues, réglages de l'Agenda. Une fois en ligne, elle tient cette copie à jour pour **tout l'espace de travail** par un seul appel incrémental (`GET /api/workspaces/{id}/offline?since=…` : les pages et les bases modifiées depuis, et la liste de celles qui existent encore), au démarrage, au retour de la connexion et toutes les 5 minutes. Hors ligne, on ouvre donc n'importe quelle page.
 - **Écriture hors ligne** : chaque modification s'applique tout de suite à l'écran et à la copie locale, puis entre dans une **file d'attente gardée sur l'appareil** (elle survit à la fermeture de l'application), envoyée **dans l'ordre** dès que le serveur répond. Deux modifications du même objet attendant ensemble n'en font qu'une (le dernier document d'une page, les champs d'une ligne réunis). Ce qui fonctionne hors ligne : le corps des pages, titre, icône, couverture, favori, créer, déplacer, mettre à la corbeille et restaurer une page ; créer une ligne et changer ses propriétés ; propriétés, vues, filtres et tris d'une base ; réglages de l'Agenda. Les créations hors ligne reçoivent leur identifiant (ULID) sur l'appareil ; l'API les accepte, et le même envoi répété ne crée jamais de doublon.
-- **Ce qui demande une connexion** (le bouton le dit : « Indisponible hors ligne ») : envoyer un fichier, aperçu de lien, importer un agenda, connecter Google ou iCloud, publier le lien ICS d'une base, la recherche plein texte (la recherche dans les titres reste possible), créer une base de données.
+- **Ce qui demande une connexion** (le bouton le dit : « Indisponible hors ligne ») : aperçu de lien, importer un agenda, connecter Google ou iCloud, publier le lien ICS d'une base, créer une base de données. (Envoyer un fichier et la recherche plein texte fonctionnent hors ligne depuis le complément du 16 novembre, ci-dessous.)
 - **Indicateur** : dans la barre du haut, à la place de « Enregistré » : « Hors ligne · 3 modifications en attente », puis « Synchronisation… », puis « Enregistré ». Intention : savoir sans chercher si son travail est parti.
 - **Conflits** :
   - **Corps d'une page** : verrouillage optimiste (1.3.5) comme aujourd'hui. Si la page a changé sur le serveur depuis la version de départ, la fenêtre « Cette page a été modifiée ailleurs » propose **« Recharger »**, **« Écraser avec ma version »** et **« Gestion de conflit »**. Si la page n'est pas ouverte au moment de la synchronisation, le conflit est gardé et signalé (« 1 conflit à résoudre » dans la barre du haut) ; l'ouvrir mène à la page et à la fenêtre.
@@ -573,6 +573,22 @@ Below is the detailed technical specification and UX intent required for impleme
   - La même page modifiée sur un autre appareil pendant ce temps : la fenêtre propose les trois choix ; « Gestion de conflit » montre les deux versions et les différences ; chacun des deux choix donne le bon résultat sur le serveur.
   - Se déconnecter efface la copie locale.
   - Le site web garde son comportement (rien sur l'appareil).
+
+**Complément** (16 novembre, mot pour mot) : « Il faut que l'application garde une copie des fichiers en local quand le fichier quand le fichier a été récemment utilisé afin de pouvoir utiliser Nonotion à 100% sans connexion en naviguant à travers les pages et que les modifications faites soient envoyé quand il y a à nouveau de la connexion à internet. »
+
+**Mise en œuvre** :
+
+- **Fichiers récemment utilisés** : chaque fichier envoyé dans Nonotion (image, vidéo, audio, fichier, couverture de page) affiché ou ouvert sur l'appareil y est gardé (IndexedDB), lu par l'API (`GET /api/files/<espace>/<identifiant>/<nom>`, réservé à qui voit l'espace de travail). Hors ligne, il s'affiche depuis cette copie ; en ligne aussi (plus rapide). Les moins récemment utilisés partent au-delà de 500 Mo, ou après 60 jours sans usage ; un fichier de plus de 100 Mo n'est pas gardé. Les images d'autres sites (aperçus de liens, images collées par leur adresse) ne sont pas gardées : leur site ne le permet en général pas.
+- **Ajouter un fichier hors ligne** : il s'affiche aussitôt dans la page, attend dans la file avec les autres modifications, et part au retour de la connexion (avec l'identifiant choisi par l'appareil : jamais de doublon) ; la page reçoit alors son adresse définitive. Refusé par le serveur (trop lourd, place épuisée) : on le dit, et le bloc redevient vide.
+- **Naviguer hors ligne** : la copie de l'espace de travail contient aussi l'Agenda et la corbeille (ouverts hors ligne même jamais ouverts sur l'appareil) ; les liens de planification et « Qui peut voir mes disponibilités » s'affichent tels que vus la dernière fois.
+- **Rechercher hors ligne** : dans le titre et le texte de toutes les pages de la copie, avec un extrait.
+- **Ce qui demande toujours une connexion** : créer une base de données, dupliquer une page, supprimer définitivement, l'aperçu d'un lien (le lien s'ajoute sans aperçu), importer un agenda, connecter Google ou iCloud, publier le lien ICS, Planifier (créer ou modifier un lien, voir les disponibilités d'une personne).
+- **Critères d'acceptation** :
+  - Une image vue une fois en ligne s'affiche hors ligne, après fermeture et réouverture de l'application.
+  - Une image ajoutée hors ligne s'affiche tout de suite, arrive sur le serveur au retour de la connexion, et la page enregistrée sur le serveur pointe vers elle.
+  - Hors ligne, la recherche trouve une page par un mot de son texte.
+  - Hors ligne, l'Agenda et la corbeille s'ouvrent sans avoir été ouverts avant sur l'appareil.
+  - Se déconnecter efface aussi les fichiers gardés.
 
 ### 6.17 Planifier (disponibilités et liens de planification) : phase 12
 

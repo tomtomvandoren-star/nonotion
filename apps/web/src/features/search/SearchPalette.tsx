@@ -1,5 +1,5 @@
-import type { SearchResult } from '@nonotion/shared'
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import type { DatabaseDetail, PageDetail, SearchResult } from '@nonotion/shared'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { Search } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
@@ -8,9 +8,12 @@ import { displayTitle } from '@/features/pages/displayTitle'
 import { PageGlyph } from '@/features/pages/PageGlyph'
 import { useTree, useWorkspaceId } from '@/features/pages/queries'
 import { searchPages } from '@/lib/api/pages'
+import { useNetwork } from '@/lib/offline/network'
 import { cn } from '@/lib/utils'
+import { platform } from '@/platform'
 import { useUi } from '@/stores/ui'
 import { highlight, matchesAll, searchTerms } from './highlight'
+import { searchPagesLocally } from './localSearch'
 
 type Item = Pick<SearchResult, 'id' | 'title' | 'icon' | 'context' | 'excerpt'>
 
@@ -51,13 +54,32 @@ function PaletteBody({ picking, onClose }: { picking: boolean; onClose: () => vo
   const list = useRef<HTMLUListElement>(null)
 
   const terms = useMemo(() => searchTerms(query), [query])
+  // Hors ligne, dans les applications : le texte des pages gardées sur l'appareil (spec 6.16).
+  const online = useNetwork((s) => s.online)
+  const offline = platform.offline && !online
+  const queryClient = useQueryClient()
   const server = useQuery({
     queryKey: ['search', workspaceId, debounced],
     queryFn: ({ signal }) => searchPages(workspaceId, debounced, signal),
-    enabled: workspaceId !== '' && debounced.trim() !== '',
+    enabled: !offline && workspaceId !== '' && debounced.trim() !== '',
     staleTime: 30_000,
     placeholderData: keepPreviousData,
   })
+  const onDevice = useMemo(() => {
+    if (!offline || debounced.trim() === '') return []
+    const pages = queryClient
+      .getQueryCache()
+      .findAll({ queryKey: ['page'] })
+      .flatMap((cached) => (cached.state.data ? [cached.state.data as PageDetail] : []))
+    const titles = new Map((tree.data ?? []).map((page) => [page.id, page.title]))
+    return searchPagesLocally(pages, searchTerms(debounced), (page) =>
+      page.database_id
+        ? (queryClient.getQueryData<DatabaseDetail>(['database', page.database_id])?.title ?? null)
+        : page.parent_page_id
+          ? (titles.get(page.parent_page_id) ?? null)
+          : null,
+    )
+  }, [offline, debounced, queryClient, tree.data])
 
   const items: Item[] = useMemo(() => {
     if (query.trim() === '')
@@ -74,14 +96,14 @@ function PaletteBody({ picking, onClose }: { picking: boolean; onClose: () => vo
         context: page.parent_page_id ? (titles.get(page.parent_page_id) ?? null) : null,
         excerpt: null,
       }))
-    const remote = debounced.trim() === query.trim() ? (server.data ?? []) : []
+    const remote = debounced.trim() !== query.trim() ? [] : offline ? onDevice : (server.data ?? [])
     // Le serveur connaît aussi le texte des pages : il complète (et précise l'extrait).
     const byId = new Map(remote.map((result) => [result.id, result]))
     return [
       ...local.map((item) => byId.get(item.id) ?? item),
       ...remote.filter((result) => !local.some((item) => item.id === result.id)),
     ]
-  }, [query, debounced, terms, recent, tree.data, server.data])
+  }, [query, debounced, terms, recent, tree.data, server.data, offline, onDevice])
 
   const choose = (item: Item | undefined) => {
     if (!item) return

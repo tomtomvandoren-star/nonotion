@@ -32,6 +32,7 @@ import { consumeTitleFocus, requestTitleFocus } from '@/features/pages/useNewPag
 import { ApiError } from '@/lib/api/client'
 import { createDatabase } from '@/lib/api/databases'
 import { uploadFile } from '@/lib/api/media'
+import { useFileUrl } from '@/lib/offline/useFileUrl'
 import { savePageContent } from '@/lib/api/pages'
 import { resolveConflict, setConflict, useOutbox, useSavedVersions } from '@/lib/offline/outbox'
 import { useDebouncedSave } from '@/lib/useDebouncedSave'
@@ -91,7 +92,8 @@ function PageDocument({ page, variant }: { page: PageDetail; variant: 'page' | '
   }, [rememberPage, page.id, page.title, page.icon])
   const titleRef = useRef<HTMLTextAreaElement>(null)
   const editorRef = useRef<BlockEditorHandle>(null)
-  const cover = page.cover_url ? coverStyle(page.cover_url) : null
+  const coverShown = useFileUrl(page.cover_url)
+  const cover = page.cover_url ? coverStyle(page.cover_url, coverShown ?? undefined) : null
   const patch = (values: Parameters<typeof updatePage.mutate>[0]['patch']) =>
     updatePage.mutate({ pageId: page.id, patch: values })
 

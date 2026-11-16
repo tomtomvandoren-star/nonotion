@@ -83,7 +83,10 @@ it('la copie de l’espace : tout la première fois, puis seulement ce qui a cha
     expect($first['pages'])->toHaveCount($pageCount)
         ->and($first['databases'])->toHaveCount(1)
         ->and($first['page_ids'])->toHaveCount($pageCount)
-        ->and($first['pages'][0])->toHaveKeys(['id', 'content', 'version']);
+        ->and($first['pages'][0])->toHaveKeys(['id', 'content', 'version'])
+        // L'Agenda et la corbeille viennent avec : ils s'ouvrent aussi hors ligne.
+        ->and($first['agenda']['databases'])->toHaveCount(1)
+        ->and($first['trash'])->toBe([]);
 
     // Une heure plus tard : une page modifiée, une ligne ajoutée, une page à la corbeille.
     Carbon::setTestNow('2026-11-14 11:00:00');
@@ -100,7 +103,8 @@ it('la copie de l’espace : tout la première fois, puis seulement ce qui a cha
     expect($titles)->toContain('Renommée')->toContain('Nouvelle tâche')
         ->and(count($next['pages']))->toBeLessThan($pageCount)
         ->and($next['databases'])->toHaveCount(1)
-        ->and($next['page_ids'])->not->toContain($gone);
+        ->and($next['page_ids'])->not->toContain($gone)
+        ->and(collect($next['trash'])->pluck('id'))->toContain($gone);
 
     // Rien n'a bougé depuis : rien à renvoyer, sauf les listes.
     Carbon::setTestNow('2026-11-14 12:00:00');

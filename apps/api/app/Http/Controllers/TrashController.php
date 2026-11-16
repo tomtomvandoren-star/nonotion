@@ -23,6 +23,16 @@ class TrashController extends Controller
     {
         Gate::authorize('view', $workspace);
 
+        return response()->json(['data' => self::items($workspace)]);
+    }
+
+    /**
+     * Les pages de la corbeille, les plus récentes d'abord (aussi dans la copie hors ligne).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function items(Workspace $workspace): array
+    {
         // Une ligne de base supprimée seule y figure aussi ; partie avec sa page, elle reviendra avec elle.
         $trashed = Page::onlyTrashed()
             ->where('workspace_id', $workspace->id)
@@ -43,7 +53,7 @@ class TrashController extends Controller
                 'deleted_at' => $page->deleted_at?->toIso8601String(),
             ]);
 
-        return response()->json(['data' => $roots]);
+        return $roots->all();
     }
 
     /** Restaure la page et les sous-pages supprimées en même temps qu'elle. */

@@ -24,6 +24,7 @@ import { BLOCK_CHOICES, filterChoices } from './blockChoices'
 import { toEditorContent } from './content'
 import { createMarkdownFallback } from './markdownFallback'
 import { mediaItems } from './media/mediaItems'
+import { LOCAL_FILE, resolveFile } from '@/lib/offline/files'
 import { isWebUrl } from './media/urls'
 import type { NonotionBlock, NonotionEditor, NonotionPartialBlock } from './schema'
 import { SIDE_MENU_FLOATING } from './sideMenuPosition'
@@ -315,8 +316,14 @@ export default function BlockEditor({
     initialContent: toEditorContent(content, BLOCK_TYPES) as NonotionPartialBlock[] | undefined,
     uploadFile,
     // Une image, une vidéo ou un fichier ne s'affiche ou ne s'ouvre que depuis le web : jamais un
-    // « javascript: » collé comme lien. (blob: : l'aperçu pendant l'envoi.)
-    resolveFileUrl: async (url) => (isWebUrl(url) || url.startsWith('blob:') ? url : ''),
+    // « javascript: » collé comme lien. (blob: : l'aperçu pendant l'envoi.) Dans les applications,
+    // la copie gardée sur l'appareil, ou le fichier ajouté hors ligne (spec 6.16).
+    resolveFileUrl: async (url) =>
+      isWebUrl(url) || url.startsWith(LOCAL_FILE)
+        ? resolveFile(url)
+        : url.startsWith('blob:')
+          ? url
+          : '',
     // La ligne qui montre où le bloc glissé va tomber (P4), dans la couleur d'accent.
     dropCursor: { color: 'var(--accent)', width: 3 },
     extensions: [

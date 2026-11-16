@@ -78,6 +78,9 @@ Route::middleware(['auth:sanctum', 'throttle:240,1'])->group(function () {
     Route::patch('/pages/{page}', [PageController::class, 'update']);
     Route::put('/pages/{page}/content', [PageController::class, 'updateContent']);
     Route::post('/pages/{page}/files', [UploadController::class, 'store']);
+    // Le contenu d'un fichier, pour la copie hors ligne des applications (spec 6.16).
+    Route::get('/files/{path}', [UploadController::class, 'show'])
+        ->where('path', '[0-9a-z]{26}/[0-9a-z]{26}/[A-Za-z0-9._-]+');
     Route::post('/pages/{page}/move', [PageController::class, 'move']);
     Route::post('/pages/{page}/duplicate', [PageController::class, 'duplicate']);
     Route::delete('/pages/{page}', [PageController::class, 'destroy']);

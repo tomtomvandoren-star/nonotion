@@ -102,6 +102,40 @@ it('n’envoie rien dans la page d’un autre utilisateur', function () {
     expect(Storage::disk('uploads')->allFiles())->toBe([]);
 });
 
+it('un fichier ajouté hors ligne garde l’identifiant choisi par l’application, sans doublon au renvoi', function () {
+    $workspace = signIn();
+    $page = mediaPage($workspace);
+    $id = '01m7f0k9c3q8e5v2b6n4t1x7za';
+
+    $first = $this->post("/api/pages/{$page}/files", [
+        'file' => UploadedFile::fake()->image('plage.png'), 'id' => $id,
+    ], ['Accept' => 'application/json'])->assertCreated()->json();
+    expect($first['id'])->toBe($id)->and($first['url'])->toContain("/{$id}/plage.png");
+
+    // Renvoyé après une coupure : le même fichier, rien de plus sur le disque.
+    $this->post("/api/pages/{$page}/files", [
+        'file' => UploadedFile::fake()->image('plage.png'), 'id' => $id,
+    ], ['Accept' => 'application/json'])->assertOk()->assertJsonPath('url', $first['url']);
+    expect(Upload::query()->withoutGlobalScopes()->count())->toBe(1)
+        ->and(Storage::disk('uploads')->allFiles())->toHaveCount(1);
+});
+
+it('l’application lit le contenu d’un fichier par l’API pour en garder une copie, pas celui d’un autre', function () {
+    $workspace = signIn('Alice');
+    $page = mediaPage($workspace);
+    $stored = upload($page, UploadedFile::fake()->createWithContent('notes.txt', 'Bonjour'))->assertCreated()->json();
+    $path = Upload::query()->withoutGlobalScopes()->findOrFail($stored['id'])->path;
+
+    $response = $this->get("/api/files/{$path}")->assertOk();
+    expect($response->streamedContent())->toBe('Bonjour')
+        ->and($response->headers->get('Content-Type'))->toStartWith('text/plain')
+        ->and($response->headers->get('Content-Security-Policy'))->toContain('sandbox');
+
+    Sanctum::actingAs(createAccount('Bob'));
+    $this->getJson("/api/files/{$path}")->assertNotFound();
+    $this->getJson('/api/files/'.str_replace('notes', 'autre', $path))->assertNotFound();
+});
+
 it('demande d’être connecté pour envoyer un fichier ou lire un aperçu', function () {
     $page = mediaPage(signIn());
     app('auth')->forgetGuards();
@@ -110,6 +144,7 @@ it('demande d’être connecté pour envoyer un fichier ou lire un aperçu', fun
         'file' => UploadedFile::fake()->image('x.png'),
     ], ['Accept' => 'application/json'])->assertUnauthorized();
     $this->postJson('/api/link-preview', ['url' => 'https://exemple.com'])->assertUnauthorized();
+    $this->getJson('/api/files/01m7f0k9c3q8e5v2b6n4t1x7za/01m7f0k9c3q8e5v2b6n4t1x7zb/x.png')->assertUnauthorized();
 });
 
 it('aperçu d’un lien : titre, description, image et icône lus dans les balises Open Graph', function () {

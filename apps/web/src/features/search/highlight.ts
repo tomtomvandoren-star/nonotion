@@ -55,3 +55,18 @@ export function matchesAll(text: string, terms: readonly string[]): boolean {
   const folded = fold(text)
   return terms.length > 0 && terms.every((term) => folded.includes(term))
 }
+
+/**
+ * Un extrait du texte autour du premier mot cherché trouvé (la recherche hors ligne, spec 6.16) ;
+ * null si aucun n'y est.
+ */
+export function excerptAround(text: string, terms: readonly string[], radius = 60): string | null {
+  const folded = fold(text)
+  const at = Math.min(...terms.map((term) => folded.indexOf(term)).filter((index) => index >= 0))
+  if (!Number.isFinite(at)) return null
+  const chars = Array.from(text)
+  const start = Math.max(0, at - radius)
+  const end = Math.min(chars.length, at + radius * 2)
+  const excerpt = chars.slice(start, end).join('').replace(/\s+/g, ' ').trim()
+  return `${start > 0 ? '…' : ''}${excerpt}${end < chars.length ? '…' : ''}`
+}

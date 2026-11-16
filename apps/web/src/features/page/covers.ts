@@ -33,16 +33,20 @@ export function randomCover(): string {
   return presetCover(names[Math.floor(Math.random() * names.length)] ?? 'peche')
 }
 
-/** Style CSS d'une couverture, ou null si la valeur n'est pas reconnue. */
-export function coverStyle(coverUrl: string): CSSProperties | null {
+/**
+ * Style CSS d'une couverture, ou null si la valeur n'est pas reconnue. `shown` : ce qu'on affiche
+ * pour une image https (sa copie sur l'appareil, dans les applications, spec 6.16).
+ */
+export function coverStyle(coverUrl: string, shown: string = coverUrl): CSSProperties | null {
   if (coverUrl.startsWith('preset:')) {
     const background = COVER_PRESETS[coverUrl.slice('preset:'.length) as CoverPreset]
     return background ? { background } : null
   }
   if (coverUrl.startsWith('https://')) {
+    const image = shown.startsWith('blob:') ? shown : coverUrl
     // JSON.stringify échappe guillemets et antislashs : l'adresse reste une simple chaîne CSS.
     return {
-      backgroundImage: `url(${JSON.stringify(coverUrl)})`,
+      backgroundImage: `url(${JSON.stringify(image)})`,
       backgroundSize: 'cover',
       backgroundPosition: 'center',
     }

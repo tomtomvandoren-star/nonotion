@@ -1,6 +1,7 @@
 import type { z } from 'zod'
+import { localFile, withUploadedUrls } from '@/lib/offline/files'
 import { isNetworkError, isOnline, markOffline, markOnline } from '@/lib/offline/network'
-import { enqueue, hasQueued, type Merge, type OutboxEntry } from '@/lib/offline/outbox'
+import { enqueue, hasQueued, isUpload, type Merge, type OutboxEntry } from '@/lib/offline/outbox'
 import { getToken } from '@/lib/session'
 import { platform } from '@/platform'
 
@@ -92,8 +93,10 @@ async function send(
   const token = getToken()
   const headers: Record<string, string> = { Accept: 'application/json' }
   // Un fichier part tel quel (multipart) : le navigateur écrit lui-même l'en-tête Content-Type.
-  const form = body instanceof FormData
-  if (body !== undefined && !form) headers['Content-Type'] = 'application/json'
+  const form = body instanceof FormData ? body : null
+  // Un fichier ajouté hors ligne et envoyé depuis : la page cite sa vraie adresse (spec 6.16).
+  const json = form || body === undefined ? undefined : JSON.stringify(withUploadedUrls(body))
+  if (json !== undefined) headers['Content-Type'] = 'application/json'
   if (token) headers.Authorization = `Bearer ${token}`
 
   const write = method !== 'GET'
@@ -103,7 +106,7 @@ async function send(
     response = await fetch(apiUrl(path), {
       method,
       headers,
-      body: body === undefined ? undefined : form ? body : JSON.stringify(body),
+      body: form ?? json,
       keepalive,
       signal,
     })
@@ -121,7 +124,20 @@ async function send(
 
 /** Un envoi de la file d'attente (spec 6.16) : la réponse brute, refus compris. */
 export async function sendQueued(entry: OutboxEntry): Promise<{ status: number; data: unknown }> {
-  const { response, data } = await send(entry.method, entry.path, entry.body, {})
+  let body = entry.body
+  // Un fichier ajouté hors ligne : son contenu attend sur l'appareil, il part en multipart.
+  if (isUpload(entry)) {
+    const { id, name, type } = (
+      entry.body as { upload: { id: string; name: string; type: string } }
+    ).upload
+    const blob = await localFile(id)
+    if (!blob) return { status: 422, data: { message: 'le fichier n’est plus sur cet appareil' } }
+    const form = new FormData()
+    form.append('file', new File([blob], name, { type }))
+    form.append('id', id)
+    body = form
+  }
+  const { response, data } = await send(entry.method, entry.path, body, {})
   if (response.status === 401 && getToken()) onUnauthorized()
   return { status: response.status, data }
 }
@@ -189,6 +205,15 @@ async function request<T>(
   }
 
   return schema.parse(data)
+}
+
+/** Le contenu d'un fichier envoyé, par l'API : pour en garder une copie sur l'appareil (spec 6.16). */
+export function fetchUploadContent(path: string, signal: AbortSignal): Promise<Response> {
+  const token = getToken()
+  return fetch(apiUrl(`files/${path}`), {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    signal,
+  })
 }
 
 export const apiGet = <T>(path: string, schema: z.ZodType<T>, signal?: AbortSignal) =>

@@ -1,20 +1,33 @@
 import {
+  agendaSchema,
   databaseDetailSchema,
   pageDetailSchema,
+  trashItemSchema,
   type DatabaseDetail,
   type PageDetail,
 } from '@nonotion/shared'
 import { dehydrate, hydrate, type QueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { z } from 'zod'
-import { apiGet, apiUrl, sendQueued } from '@/lib/api/client'
+import { apiGet, apiUrl, fetchUploadContent, sendQueued } from '@/lib/api/client'
+import {
+  clearFiles,
+  configureFiles,
+  evictFiles,
+  loadReplaced,
+  LOCAL_FILE,
+  settleLocalFile,
+} from './files'
 import { onReconnect, isOnline, watchNetwork } from './network'
 import {
   configureOutbox,
   flushOutbox,
   hasQueued,
+  isUpload,
   loadOutbox,
+  replaceInQueue,
   resetOutbox,
+  type OutboxEntry,
   useOutbox,
   useSavedVersions,
 } from './outbox'
@@ -26,8 +39,20 @@ import { clearAll, readKey, writeKey } from './storage'
  * d'attente des modifications, et leur envoi au retour de la connexion.
  */
 
-/** Les données gardées sur l'appareil : profil, arbre, pages, bases, Agenda. */
-const KEPT = new Set(['profile', 'tree', 'page', 'database', 'agenda'])
+/**
+ * Les données gardées sur l'appareil : profil, arbre, pages, bases, Agenda, corbeille, et les
+ * listes de Planifier telles que vues la dernière fois.
+ */
+const KEPT = new Set([
+  'profile',
+  'tree',
+  'page',
+  'database',
+  'agenda',
+  'trash',
+  'scheduling-links',
+  'freebusy-shares',
+])
 const QUERIES_KEY = 'queries'
 /** Toutes les 5 minutes, la copie de l'espace de travail est remise à jour. */
 const SYNC_EVERY_MS = 5 * 60_000
@@ -38,13 +63,15 @@ const offlineCopySchema = z.object({
     databases: z.array(databaseDetailSchema),
     page_ids: z.array(z.string()),
     database_ids: z.array(z.string()),
+    agenda: agendaSchema,
+    trash: z.array(trashItemSchema),
     server_time: z.string(),
   }),
 })
 
 /** Relit, avant le premier affichage, la copie locale et la file d'attente. */
 export async function restoreOffline(queryClient: QueryClient): Promise<void> {
-  const [state] = await Promise.all([readKey<unknown>(QUERIES_KEY), loadOutbox()])
+  const [state] = await Promise.all([readKey<unknown>(QUERIES_KEY), loadOutbox(), loadReplaced()])
   if (state) hydrate(queryClient, state as Parameters<typeof hydrate>[1])
 }
 
@@ -102,6 +129,8 @@ export async function syncWorkspace(queryClient: QueryClient): Promise<void> {
     for (const page of data.pages) queryClient.setQueryData<PageDetail>(['page', page.id], page)
     for (const database of data.databases)
       queryClient.setQueryData<DatabaseDetail>(['database', database.id], database)
+    queryClient.setQueryData(['agenda', workspaceId], data.agenda)
+    queryClient.setQueryData(['trash', workspaceId], data.trash)
     // Ce qui n'existe plus (corbeille, supprimé ailleurs) quitte la copie.
     const pages = new Set(data.page_ids)
     const databases = new Set(data.database_ids)
@@ -120,15 +149,45 @@ export async function syncWorkspace(queryClient: QueryClient): Promise<void> {
   }
 }
 
+/** Remplace une adresse dans les pages gardées (l'adresse locale d'un fichier ajouté hors ligne). */
+function replaceInPages(queryClient: QueryClient, from: string, to: string) {
+  const needle = JSON.stringify(from).slice(1, -1)
+  const target = JSON.stringify(to).slice(1, -1)
+  for (const query of queryClient.getQueryCache().findAll({ queryKey: ['page'] })) {
+    const json = JSON.stringify(query.state.data)
+    if (json?.includes(needle))
+      queryClient.setQueryData(query.queryKey, JSON.parse(json.split(needle).join(target)))
+  }
+}
+
+/**
+ * Un fichier ajouté hors ligne est arrivé (ou a été refusé : '') : ce qui attend encore, et les pages
+ * gardées, citent désormais sa vraie adresse ; sa copie passe sous cette adresse.
+ */
+function settleUpload(queryClient: QueryClient, entry: OutboxEntry, url: string) {
+  const { id } = (entry.body as { upload: { id: string } }).upload
+  replaceInQueue(`${LOCAL_FILE}${id}`, url)
+  replaceInPages(queryClient, `${LOCAL_FILE}${id}`, url)
+  void settleLocalFile(id, url)
+}
+
 /** Démarre le travail hors ligne : file d'attente, copie locale, synchronisation. */
 export function startOffline(queryClient: QueryClient): void {
+  configureFiles(fetchUploadContent)
+  void evictFiles()
   configureOutbox({
     send: sendQueued,
     onDrained: () => {
       void queryClient.invalidateQueries().then(() => syncWorkspace(queryClient))
     },
-    onRejected: (entry, message) =>
-      toast.error(`Une modification faite hors ligne a été refusée (${entry.label}) : ${message}`),
+    onSent: (entry, data) => {
+      const url = (data as { url?: unknown } | null)?.url
+      if (isUpload(entry) && typeof url === 'string') settleUpload(queryClient, entry, url)
+    },
+    onRejected: (entry, message) => {
+      if (isUpload(entry)) settleUpload(queryClient, entry, '')
+      toast.error(`Une modification faite hors ligne a été refusée (${entry.label}) : ${message}`)
+    },
     onContentSaved: (pageId, version) => {
       // D'abord la page ouverte (son prochain envoi repart de là), puis la copie.
       useSavedVersions.setState({ [pageId]: version })
@@ -146,6 +205,19 @@ export function startOffline(queryClient: QueryClient): void {
   }
   onReconnect(catchUp)
   catchUp()
+  // Juste après la connexion (ou au premier lancement), le profil arrive après ce premier essai : la
+  // copie de l'espace de travail se fait dès qu'il est là, sans attendre 5 minutes.
+  let copiedFor: string | undefined = queryClient.getQueryData<{ workspaces: { id: string }[] }>([
+    'profile',
+  ])?.workspaces[0]?.id
+  queryClient.getQueryCache().subscribe((event) => {
+    if (event.type !== 'updated' || event.query.queryKey[0] !== 'profile') return
+    const workspaceId = (event.query.state.data as { workspaces?: { id: string }[] } | undefined)
+      ?.workspaces?.[0]?.id
+    if (!workspaceId || workspaceId === copiedFor) return
+    copiedFor = workspaceId
+    catchUp()
+  })
   setInterval(() => {
     if (document.visibilityState === 'visible') catchUp()
   }, SYNC_EVERY_MS)
@@ -159,5 +231,5 @@ export async function forgetOffline(queryClient: QueryClient): Promise<void> {
   resetOutbox()
   useSavedVersions.setState({}, true)
   queryClient.clear()
-  await clearAll()
+  await Promise.all([clearAll(), clearFiles()])
 }
